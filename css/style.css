@@ -281,6 +281,36 @@ body {
     transform: scaleY(1);
 }
 
+/* ---- Sidebar Dropdown ---- */
+.sidebar-dropdown-btn {
+    transition: all 0.2s ease;
+}
+
+.sidebar-dropdown-btn:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.sidebar-dropdown-content {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sidebar-dropdown-icon {
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* When active/expanded */
+.sidebar-dropdown.expanded .sidebar-dropdown-icon {
+    transform: rotate(180deg);
+}
+
+/* Make inner links slightly indented */
+.sidebar-dropdown-content .sidebar-link {
+    padding-left: 3rem;
+    font-size: 0.8125rem;
+}
+
 /* ---- Table ---- */
 .data-table {
     width: 100%;
