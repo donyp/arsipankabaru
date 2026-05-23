@@ -667,7 +667,9 @@ async function deleteBroadcast(id) {
         await API.del(`/api/broadcasts/${id}`);
         Toast.success('Pengumuman dihapus');
         openManageBroadcasts(); // Refresh list
-        loadBroadcast(); // Refresh current marquee
+        if (typeof window.loadGlobalBroadcast === 'function') {
+            await window.loadGlobalBroadcast();
+        }
     } catch (err) {
         Toast.error('Gagal menghapus: ' + err.message);
     }
