@@ -123,7 +123,19 @@
         // Check if already logged in via JWT
         (function () {
             const token = API.getToken();
-            if (token) {
+            const urlParams = new URLSearchParams(window.location.search);
+            const reason = urlParams.get('reason');
+
+            if (reason === 'maintenance') {
+                const errorDiv = document.getElementById('login-error');
+                const errorText = document.getElementById('login-error-text');
+                if (errorDiv && errorText) {
+                    errorDiv.classList.remove('hidden');
+                    errorText.innerHTML = '<strong>Sistem Sedang Perbaikan:</strong> Akses ditangguhkan sementara. Silakan coba lagi nanti.';
+                    // Clear param from URL without refresh
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                }
+            } else if (token) {
                 window.location.href = 'dashboard.html';
             }
         })();

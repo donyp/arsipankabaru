@@ -86,6 +86,13 @@ const API = {
             throw new Error(body.error || 'Akses ditolak.');
         }
 
+        // Handle Maintenance Mode (503)
+        if (res.status === 503) {
+            this.clearAuth();
+            window.location.href = 'index.html?reason=maintenance';
+            throw new Error('Sistem sedang dalam perbaikan.');
+        }
+
         if (!res.ok) {
             const body = await res.json().catch(() => ({}));
             throw new Error(body.error || `HTTP Error ${res.status}`);

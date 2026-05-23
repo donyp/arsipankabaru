@@ -64,6 +64,17 @@ const uploadMediaMulter = multer({
 const JWT_SECRET = process.env.JWT_SECRET || 'change-this-to-a-very-long-random-string';
 const JWT_EXPIRES_IN = '8h';
 
+// Maintenance Mode Helper
+const MAINTENANCE_FILE = path.join(__dirname, 'maintenance_status.json');
+function getMaintenanceStatus() {
+    try {
+        if (!fs.existsSync(MAINTENANCE_FILE)) return { isMaintenance: false };
+        return JSON.parse(fs.readFileSync(MAINTENANCE_FILE, 'utf8'));
+    } catch (err) {
+        return { isMaintenance: false };
+    }
+}
+
 // ============================================================
 // AUTH MIDDLEWARE
 // ============================================================
@@ -91,6 +102,15 @@ function authenticateToken(req, res, next) {
         }
 
         req.user = decoded;
+
+        // --- MAINTENANCE MODE ENFORCEMENT ---
+        const sys = getMaintenanceStatus();
+        if (sys.isMaintenance && decoded.role === 'admin_zona') {
+            return res.status(503).json({
+                error: 'Sistem Sedang Perbaikan',
+                message: 'Akses Admin Zona ditangguhkan sementara untuk pemeliharaan teknis. Silakan coba lagi nanti.'
+            });
+        }
 
         // Session Heartbeat (Asynchronous)
         const sessionId = req.headers['x-session-id'];
@@ -1469,6 +1489,35 @@ app.get('/api/broadcasts/latest', authenticateToken, async (req, res) => {
     } catch (err) {
         console.error('Broadcast Load Error:', err);
         res.status(500).json({ error: 'Gagal memuat pengumuman.' });
+    }
+});
+
+// GET /api/system/maintenance — Get current system status
+app.get('/api/system/maintenance', authenticateToken, async (req, res) => {
+    res.json(getMaintenanceStatus());
+});
+
+// POST /api/system/maintenance — Toggle maintenance mode
+app.post('/api/system/maintenance', authenticateToken, authorizeRole('super_admin', 'moderator'), async (req, res) => {
+    try {
+        const { isMaintenance } = req.body;
+        const status = {
+            isMaintenance: !!isMaintenance,
+            updatedBy: req.user.name || req.user.email,
+            updatedAt: new Date().toISOString()
+        };
+        fs.writeFileSync(MAINTENANCE_FILE, JSON.stringify(status, null, 4));
+
+        // Audit Log
+        await supabase.from('audit_logs').insert({
+            user_id: req.user.userId,
+            action: isMaintenance ? 'Enable Maintenance' : 'Disable Maintenance',
+            context: JSON.stringify(status)
+        });
+
+        res.json({ success: true, status });
+    } catch (err) {
+        res.status(500).json({ error: 'Gagal memperbarui status sistem: ' + err.message });
     }
 });
 

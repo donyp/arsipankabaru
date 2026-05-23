@@ -35,6 +35,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (hasPermission('view_dashboard_stats')) {
         document.getElementById('admin-controls')?.classList.remove('hidden');
     }
+    // Load Maintenance Status for Pusat
+    if (hasPermission('manage_system') || user.role === 'moderator' || user.role === 'super_admin') {
+        loadMaintenanceStatus();
+    }
     setupEventListeners();
     setupIntersectionObserver();
 });
@@ -1307,4 +1311,60 @@ function openRequestHistoryModal() {
 function closeRequestHistoryModal() {
     const modal = document.getElementById('request-history-modal');
     if (modal) modal.classList.add('hidden');
+}
+
+// ---- Maintenance Mode ----
+async function loadMaintenanceStatus() {
+    const btn = document.getElementById('maintenance-btn');
+    if (!btn || !hasPermission('manage_system')) return; // Extra check
+
+    try {
+        const status = await API.get('/api/system/maintenance');
+        updateMaintenanceUI(status.isMaintenance);
+        btn.classList.remove('hidden');
+    } catch (err) {
+        console.warn('Failed to load maintenance status:', err);
+    }
+}
+
+function updateMaintenanceUI(isActive) {
+    const btn = document.getElementById('maintenance-btn');
+    const text = document.getElementById('maintenance-text');
+    const ping = document.getElementById('maintenance-ping');
+    const dot = document.getElementById('maintenance-dot');
+
+    if (!btn) return;
+
+    if (isActive) {
+        btn.className = 'flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-bold bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 transition-all duration-300 shadow-lg shadow-red-500/20 cursor-pointer';
+        text.textContent = 'PERBAIKAN AKTIF';
+        ping.classList.remove('hidden');
+        dot.className = 'relative inline-flex rounded-full h-3 w-3 bg-red-500';
+    } else {
+        btn.className = 'flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-bold bg-gray-500/10 text-gray-400 border border-white/5 hover:bg-white/5 transition-all duration-300 cursor-pointer';
+        text.textContent = 'Mode Perbaikan';
+        ping.classList.add('hidden');
+        dot.className = 'relative inline-flex rounded-full h-3 w-3 bg-gray-500';
+    }
+}
+
+async function toggleMaintenance() {
+    const btn = document.getElementById('maintenance-btn');
+    const isActive = document.getElementById('maintenance-text').textContent === 'PERBAIKAN AKTIF';
+
+    const action = isActive ? 'Matikan mode perbaikan?' : 'Aktifkan mode perbaikan?\n\nSemua Admin Zona akan otomatis diperintahkan logout.';
+    if (!confirm(action)) return;
+
+    try {
+        btn.disabled = true;
+        const res = await API.post('/api/system/maintenance', { isMaintenance: !isActive });
+        if (res.success) {
+            updateMaintenanceUI(res.status.isMaintenance);
+            Toast.success(res.status.isMaintenance ? 'Mode Perbaikan diaktifkan' : 'Mode Perbaikan dimatikan');
+        }
+    } catch (err) {
+        Toast.error('Gagal mengubah status: ' + err.message);
+    } finally {
+        btn.disabled = false;
+    }
 }
