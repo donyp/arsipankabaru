@@ -181,6 +181,52 @@
                 </div>
             </div>
         `;
+
+        // Modern Global Broadcast Bar Injection
+        const mainContent = document.getElementById('main-content');
+        if (mainContent && !document.getElementById('global-broadcast-bar')) {
+            const bar = document.createElement('div');
+            bar.id = 'global-broadcast-bar';
+            bar.className = 'modern-broadcast-bar hidden'; // Hidden by default
+            bar.innerHTML = `
+                <div class="broadcast-badge">
+                    <span class="flex items-center gap-1.5">
+                        <span class="relative flex h-2 w-2">
+                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                            <span class="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
+                        </span>
+                        Broadcast
+                    </span>
+                </div>
+                <div class="broadcast-content-wrapper">
+                    <div id="global-broadcast-ticker" class="broadcast-ticker">Memuat pengumuman terbaru...</div>
+                </div>
+            `;
+            mainContent.prepend(bar);
+            loadGlobalBroadcast();
+        }
+    }
+
+    async function loadGlobalBroadcast() {
+        try {
+            // Wait for API to be available
+            if (typeof API === 'undefined') return;
+
+            const { broadcast } = await API.get('/api/broadcasts/latest');
+            const bar = document.getElementById('global-broadcast-bar');
+            const ticker = document.getElementById('global-broadcast-ticker');
+
+            if (broadcast && broadcast.content && bar && ticker) {
+                ticker.textContent = broadcast.content;
+                bar.classList.remove('hidden');
+
+                // Adjust animation speed based on text length
+                const speed = Math.max(20, broadcast.content.length / 5);
+                ticker.style.animationDuration = `${speed}s`;
+            }
+        } catch (err) {
+            console.warn('Global broadcast failed:', err);
+        }
     }
 
     // Run immediately if DOM is ready, otherwise wait
@@ -189,4 +235,6 @@
     } else {
         inject();
     }
+    // Expose globally for manual refresh (e.g. after sending broadcast)
+    window.loadGlobalBroadcast = loadGlobalBroadcast;
 })();

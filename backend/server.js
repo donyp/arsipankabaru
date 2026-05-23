@@ -1396,8 +1396,8 @@ app.delete('/api/users/:id', authenticateToken, requirePermission('manage_users'
 // OPERATIONAL FEATURES (Broadcast & Stats)
 // ============================================================
 
-// POST /api/broadcasts â€” Send broadcast (Super Admin only)
-app.post('/api/broadcasts', authenticateToken, authorizeRole('super_admin'), async (req, res) => {
+// POST /api/broadcasts — Send broadcast (Admin only)
+app.post('/api/broadcasts', authenticateToken, authorizeRole('super_admin', 'moderator'), async (req, res) => {
     try {
         const { content, target_zona_id } = req.body;
         if (!content) return res.status(400).json({ error: 'Isi pengumuman wajib diisi.' });
@@ -1418,8 +1418,8 @@ app.post('/api/broadcasts', authenticateToken, authorizeRole('super_admin'), asy
     }
 });
 
-// GET /api/broadcasts â€” Fetch all broadcasts (Super Admin only)
-app.get('/api/broadcasts', authenticateToken, authorizeRole('super_admin'), async (req, res) => {
+// GET /api/broadcasts — Fetch all broadcasts
+app.get('/api/broadcasts', authenticateToken, authorizeRole('super_admin', 'moderator'), async (req, res) => {
     try {
         const { data, error } = await supabase
             .from('broadcast_messages')
@@ -1433,25 +1433,9 @@ app.get('/api/broadcasts', authenticateToken, authorizeRole('super_admin'), asyn
     }
 });
 
-// GET /api/broadcasts â€” Fetch all broadcasts (Super Admin only)
-console.log('Registering GET /api/broadcasts');
-app.get('/api/broadcasts', authenticateToken, authorizeRole('super_admin'), async (req, res) => {
-    try {
-        const { data, error } = await supabase
-            .from('broadcast_messages')
-            .select('*, zonas(nama)')
-            .order('created_at', { ascending: false });
 
-        if (error) throw error;
-        res.json({ broadcasts: data });
-    } catch (err) {
-        res.status(500).json({ error: 'Gagal memuat daftar pengumuman.' });
-    }
-});
-
-// DELETE /api/broadcasts/:id â€” Delete broadcast (Super Admin only)
-console.log('Registering DELETE /api/broadcasts/:id');
-app.delete('/api/broadcasts/:id', authenticateToken, authorizeRole('super_admin'), async (req, res) => {
+// DELETE /api/broadcasts/:id — Delete broadcast
+app.delete('/api/broadcasts/:id', authenticateToken, authorizeRole('super_admin', 'moderator'), async (req, res) => {
     try {
         const { error } = await supabase
             .from('broadcast_messages')

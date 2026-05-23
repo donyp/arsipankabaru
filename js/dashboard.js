@@ -25,7 +25,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadZonas();
     populateFilters();
     await loadArchives();
-    await loadBroadcast();
+    // await loadBroadcast(); // Removed: now handled globally by sidebar.js
 
     await loadStorageStats();
     // Chart is available to ALL roles — backend handles zone filtering
@@ -598,24 +598,6 @@ async function copyFileLink(fileId, btnEl) {
     }
 }
 
-// ---- Broadcast System ----
-async function loadBroadcast() {
-    try {
-        const { broadcast } = await API.get('/api/broadcasts/latest');
-        const container = document.getElementById('broadcast-container');
-        const marquee = document.getElementById('broadcast-marquee');
-
-        if (broadcast && broadcast.content) {
-            // Replaced: Removed timestamp detail as requested for "modern/professional" look
-            marquee.textContent = broadcast.content;
-            container.classList.remove('hidden');
-        } else {
-            container.classList.add('hidden');
-        }
-    } catch (err) {
-        console.warn('Failed to load broadcast:', err);
-    }
-}
 
 async function sendBroadcast() {
     const input = document.getElementById('broadcast-input');
@@ -629,7 +611,9 @@ async function sendBroadcast() {
         await API.post('/api/broadcasts', { content, target_zona_id });
         Toast.success('Pengumuman berhasil disiarkan!');
         input.value = '';
-        await loadBroadcast();
+        if (typeof window.loadGlobalBroadcast === 'function') {
+            await window.loadGlobalBroadcast();
+        }
     } catch (err) {
         Toast.error('Gagal mengirim pengumuman: ' + err.message);
     }
