@@ -96,9 +96,9 @@ function loadTour() {
             content: 'Jika ada dokumen yang belum tersedia, silakan klik tombol ini untuk meminta Admin Pusat mengunggahnya.'
         },
         {
-            target: '[data-user-avatar]',
-            title: 'Profil & Sesi',
-            content: 'Di sini Anda bisa memantau status akun Anda. Jangan lupa untuk logout setelah selesai bekerja demi keamanan data.'
+            target: '#header-logout-btn',
+            title: 'Sesi & Keamanan',
+            content: 'Jangan lupa untuk logout setelah selesai bekerja demi keamanan data akun Anda.'
         }
     ];
 

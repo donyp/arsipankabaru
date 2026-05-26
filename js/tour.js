@@ -28,17 +28,17 @@ const Tour = {
         const oldOverlay = document.getElementById('tour-overlay-root');
         if (oldOverlay) oldOverlay.remove();
 
-        // Target documentElement to bypass body zoom
-        const root = document.documentElement;
+        // Target body but use inverse zoom to match viewport pixels
+        const parent = document.body;
 
         this.overlay = document.createElement('div');
         this.overlay.id = 'tour-overlay-root';
-        // z-[1000] to be above everything including scaled body
-        this.overlay.className = 'fixed inset-0 z-[1000] pointer-events-none transition-opacity duration-500 opacity-0';
-        this.overlay.style.cssText = 'pointer-events: auto;';
+        // z-[1000] and counters body zoom (0.7) by applying (1/0.7 = ~1.42857)
+        this.overlay.className = 'fixed inset-0 z-[2000] pointer-events-none transition-opacity duration-500 opacity-0';
+        this.overlay.style.cssText = 'pointer-events: auto; zoom: 1.4285714;';
 
         // create 4 panels for the "hole" effect + blur
-        const panelClass = 'fixed bg-black/60 backdrop-blur-[2px] transition-all duration-500 pointer-events-auto';
+        const panelClass = 'fixed bg-black/60 backdrop-blur-[2px] transition-all duration-300 pointer-events-auto';
 
         this.panels.top = this.createPanel(panelClass);
         this.panels.bottom = this.createPanel(panelClass);
@@ -111,7 +111,8 @@ const Tour = {
         } else {
             this.spotlight.style.opacity = '1';
             const rect = target.getBoundingClientRect();
-            const padding = 15;
+            // Standard padding for most elements, extra for dropdowns
+            const padding = step.target.includes('filter') ? 12 : 12;
 
             this.updatePanels(
                 rect.top - padding,
@@ -126,7 +127,7 @@ const Tour = {
             this.spotlight.style.width = `${rect.width + padding * 2}px`;
             this.spotlight.style.height = `${rect.height + padding * 2}px`;
 
-            // Auto scroll
+            // Auto scroll (center target in viewport)
             target.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
 
