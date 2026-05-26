@@ -61,29 +61,44 @@ function loadTour() {
 
     const tourSteps = [
         {
+            target: null,
+            title: 'Selamat Datang!',
+            content: 'Halo! Mari kita keliling sejenak untuk mengenal fitur-fitur di dashboard zona Anda agar kerja lebih efisien.'
+        },
+        {
             target: '#search-input',
             title: 'Pencarian Dokumen',
-            content: 'Cari dokumen atau berkas tertentu dengan mengetikkan nama file di sini.'
+            content: 'Gunakan kolom ini untuk mencari dokumen dengan cepat berdasarkan nama file atau nomor invoice.'
+        },
+        {
+            target: '#filter-category',
+            title: 'Kategori Dokumen',
+            content: 'Kategori ini sudah dikunci sesuai akses Anda (Invoice Merah).'
         },
         {
             target: '#filter-toko',
-            title: 'Filter Toko',
-            content: 'Saring arsip berdasarkan toko tertentu yang ada di zona Anda.'
+            title: 'Saring Toko',
+            content: 'Anda bisa melihat dokumen khusus untuk toko tertentu di dalam zona Anda.'
         },
         {
             target: '#filter-date-start',
-            title: 'Rentang Tanggal',
-            content: 'Saring dokumen berdasarkan tanggal dokumen untuk pencarian yang lebih akurat.'
+            title: 'Pilih Tanggal',
+            content: 'Saring arsip berdasarkan rentang tanggal dokumen untuk pencarian yang lebih spesifik.'
         },
         {
             target: '#archive-table',
-            title: 'Tabel Pengelolaan',
-            content: 'Semua dokumen yang Anda kelola tampil di sini. Klik pada baris untuk melihat detail atau preview.'
+            title: 'Daftar Arsip',
+            content: 'Semua berkas Anda ditampilkan di sini. Klik pada baris untuk preview atau mengunduh file.'
         },
         {
             target: '#header-request-btn',
             title: 'Tiket Request',
-            content: 'Gunakan fitur ini untuk meminta Pusat (Admin) mengunggah dokumen yang belum ada.'
+            content: 'Jika ada dokumen yang belum tersedia, silakan klik tombol ini untuk meminta Admin Pusat mengunggahnya.'
+        },
+        {
+            target: '[data-user-avatar]',
+            title: 'Profil & Sesi',
+            content: 'Di sini Anda bisa memantau status akun Anda. Jangan lupa untuk logout setelah selesai bekerja demi keamanan data.'
         }
     ];
 

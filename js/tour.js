@@ -1,12 +1,19 @@
 /**
  * Guided Tour Engine — Pusat Arsip Anka
- * Lightweight, no-dependency tour engine with premium glassmorphism aesthetics.
+ * v3.0 — Precision Overhaul (Viewport-Independent)
+ * Uses 4-panel masking for perfect sharp spotlights and zoom-independence.
  */
 
 const Tour = {
     steps: [],
     currentStep: 0,
     overlay: null,
+    panels: {
+        top: null,
+        bottom: null,
+        left: null,
+        right: null
+    },
     spotlight: null,
     tooltip: null,
 
@@ -17,54 +24,73 @@ const Tour = {
     },
 
     createElements() {
-        // Main Overlay
+        // Remove existing if any
+        const oldOverlay = document.getElementById('tour-overlay-root');
+        if (oldOverlay) oldOverlay.remove();
+
+        // Target documentElement to bypass body zoom
+        const root = document.documentElement;
+
         this.overlay = document.createElement('div');
-        this.overlay.className = 'fixed inset-0 z-[100] bg-black/60 backdrop-blur-[2px] transition-opacity duration-500 opacity-0 pointer-events-none';
+        this.overlay.id = 'tour-overlay-root';
+        // z-[1000] to be above everything including scaled body
+        this.overlay.className = 'fixed inset-0 z-[1000] pointer-events-none transition-opacity duration-500 opacity-0';
         this.overlay.style.cssText = 'pointer-events: auto;';
 
-        // Spotlight Box
+        // create 4 panels for the "hole" effect + blur
+        const panelClass = 'fixed bg-black/60 backdrop-blur-[2px] transition-all duration-500 pointer-events-auto';
+
+        this.panels.top = this.createPanel(panelClass);
+        this.panels.bottom = this.createPanel(panelClass);
+        this.panels.left = this.createPanel(panelClass);
+        this.panels.right = this.createPanel(panelClass);
+
+        // Spotlight Box (only for the border/glow)
         this.spotlight = document.createElement('div');
-        this.spotlight.className = 'absolute z-[101] rounded-2xl border-2 border-indigo-500/50 shadow-[0_0_50px_rgba(99,102,241,0.3)] transition-all duration-500 pointer-events-none';
-        this.overlay.appendChild(this.spotlight);
+        this.spotlight.className = 'fixed z-[1001] rounded-2xl border-2 border-indigo-500/50 shadow-[0_0_50px_rgba(99,102,241,0.3)] transition-all duration-500 pointer-events-none';
 
         // Tooltip
         this.tooltip = document.createElement('div');
-        this.tooltip.className = 'absolute z-[102] w-72 glass-card p-5 rounded-2xl border border-white/10 shadow-2xl transition-all duration-500 opacity-0 scale-95';
+        this.tooltip.className = 'fixed z-[1002] w-72 glass-card p-5 rounded-2xl border border-white/10 shadow-2xl transition-all duration-500 opacity-0 scale-95 pointer-events-auto';
+        this.tooltip.style.backgroundColor = 'rgba(22, 32, 50, 0.95)'; // Ensure high contrast
         this.tooltip.innerHTML = `
             <div class="flex items-center justify-between mb-3">
-                <span id="tour-counter" class="text-[10px] font-bold text-indigo-400 uppercase tracking-widest bg-indigo-500/10 px-2 py-1 rounded-lg">Step 1 / 5</span>
+                <span id="tour-counter" class="text-[10px] font-bold text-indigo-400 uppercase tracking-widest bg-indigo-500/10 px-2 py-1 rounded-lg">Langkah 1 / 8</span>
                 <button onclick="Tour.stop()" class="text-gray-500 hover:text-white transition-colors">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
             </div>
-            <h4 id="tour-title" class="text-white font-bold text-sm mb-2">Title</h4>
-            <p id="tour-desc" class="text-gray-400 text-xs leading-relaxed mb-5">Description goes here.</p>
+            <h4 id="tour-title" class="text-white font-bold text-sm mb-2">Pusat Arsip Anka</h4>
+            <p id="tour-desc" class="text-gray-400 text-xs leading-relaxed mb-5">Selamat datang di dashboard zona Anda.</p>
             <div class="flex items-center justify-between gap-3">
                 <button onclick="Tour.stop()" class="text-gray-500 hover:text-white text-[10px] font-bold uppercase tracking-wider">Lewati</button>
                 <button id="tour-next" onclick="Tour.next()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all">Selanjutnya</button>
             </div>
         `;
+
+        this.overlay.appendChild(this.panels.top);
+        this.overlay.appendChild(this.panels.bottom);
+        this.overlay.appendChild(this.panels.left);
+        this.overlay.appendChild(this.panels.right);
+        this.overlay.appendChild(this.spotlight);
         this.overlay.appendChild(this.tooltip);
 
-        document.body.appendChild(this.overlay);
+        root.appendChild(this.overlay);
+    },
+
+    createPanel(className) {
+        const p = document.createElement('div');
+        p.className = className;
+        return p;
     },
 
     start() {
         if (this.steps.length === 0) return;
-
-        // Anti-scroll
         document.body.style.overflow = 'hidden';
-
         setTimeout(() => {
             this.overlay.classList.remove('opacity-0');
             this.showStep(0);
         }, 100);
-    },
-
-    getZoom() {
-        // Detect zoom level from body (default to 1)
-        const zoom = parseFloat(getComputedStyle(document.body).zoom) || 1;
-        return zoom;
     },
 
     showStep(index) {
@@ -75,50 +101,36 @@ const Tour = {
 
         this.currentStep = index;
         const step = this.steps[index];
-        const target = document.querySelector(step.target);
+        const target = step.target ? document.querySelector(step.target) : null;
 
+        // --- 1. Position Overlay Panels ---
         if (!target || target.offsetParent === null) {
-            console.warn(`[Tour] Skipping step ${index + 1}: Target "${step.target}" is missing or hidden.`);
-            // If target is hidden or missing, skip to next
-            this.next();
-            return;
+            // Full screen dim if no target
+            this.updatePanels(0, 0, 0, 0);
+            this.spotlight.style.opacity = '0';
+        } else {
+            this.spotlight.style.opacity = '1';
+            const rect = target.getBoundingClientRect();
+            const padding = 15;
+
+            this.updatePanels(
+                rect.top - padding,
+                rect.left - padding,
+                rect.width + padding * 2,
+                rect.height + padding * 2
+            );
+
+            // Spotlight outline
+            this.spotlight.style.top = `${rect.top - padding}px`;
+            this.spotlight.style.left = `${rect.left - padding}px`;
+            this.spotlight.style.width = `${rect.width + padding * 2}px`;
+            this.spotlight.style.height = `${rect.height + padding * 2}px`;
+
+            // Auto scroll
+            target.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
 
-        const zoom = this.getZoom();
-
-        // --- 1. Positioning Spotlight ---
-        const rect = target.getBoundingClientRect();
-        const padding = 15; // Increased padding for better alignment
-
-        const x = (rect.left - padding) / zoom;
-        const y = (rect.top - padding) / zoom;
-        const w = (rect.width + padding * 2) / zoom;
-        const h = (rect.height + padding * 2) / zoom;
-
-        this.spotlight.style.width = `${w}px`;
-        this.spotlight.style.height = `${h}px`;
-        this.spotlight.style.left = `${x}px`;
-        this.spotlight.style.top = `${y}px`;
-
-        // Update Overlay Mask (Hole)
-        // Using clip-path polygon to create a clear window in the blurred overlay
-        const vw = window.innerWidth / zoom;
-        const vh = window.innerHeight / zoom;
-
-        this.overlay.style.clipPath = `polygon(
-            0% 0%, 
-            0% 100%, 
-            ${x}px 100%, 
-            ${x}px ${y}px, 
-            ${x + w}px ${y}px, 
-            ${x + w}px ${y + h}px, 
-            ${x}px ${y + h}px, 
-            ${x}px 100%, 
-            100% 100%, 
-            100% 0%
-        )`;
-
-        // --- 2. Update Content ---
+        // --- 2. Update Tooltip Content ---
         document.getElementById('tour-counter').textContent = `Langkah ${index + 1} / ${this.steps.length}`;
         document.getElementById('tour-title').textContent = step.title;
         document.getElementById('tour-desc').textContent = step.content;
@@ -126,31 +138,55 @@ const Tour = {
         const nextBtn = document.getElementById('tour-next');
         nextBtn.textContent = index === this.steps.length - 1 ? 'Selesai' : 'Selanjutnya';
 
-        // --- 3. Positioning Tooltip ---
+        // --- 3. Position Tooltip ---
         this.tooltip.classList.remove('opacity-0', 'scale-95');
 
-        const tooltipRect = this.tooltip.getBoundingClientRect();
-        const gap = 20;
+        setTimeout(() => {
+            const tooltipRect = this.tooltip.getBoundingClientRect();
+            const gap = 24;
 
-        let top = (rect.bottom + gap) / zoom;
-        let left = rect.left / zoom;
+            let top, left;
 
-        // Overflow check (y-axis)
-        if ((top * zoom) + tooltipRect.height > window.innerHeight) {
-            top = (rect.top - tooltipRect.height - gap) / zoom;
+            if (!target) {
+                // Center screen for welcome
+                top = (window.innerHeight - tooltipRect.height) / 2;
+                left = (window.innerWidth - tooltipRect.width) / 2;
+            } else {
+                const rect = target.getBoundingClientRect();
+                top = rect.bottom + gap;
+                left = rect.left;
+
+                if (top + tooltipRect.height > window.innerHeight) {
+                    top = rect.top - tooltipRect.height - gap;
+                }
+                if (left + tooltipRect.width > window.innerWidth) {
+                    left = window.innerWidth - tooltipRect.width - 24;
+                }
+                if (left < 24) left = 24;
+            }
+
+            this.tooltip.style.top = `${top}px`;
+            this.tooltip.style.left = `${left}px`;
+        }, 10);
+    },
+
+    updatePanels(t, l, w, h) {
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+
+        if (w === 0) {
+            // Full Overlay
+            this.panels.top.style.cssText = `top:0; left:0; width:100%; height:100%;`;
+            this.panels.bottom.style.height = '0';
+            this.panels.left.style.width = '0';
+            this.panels.right.style.width = '0';
+            return;
         }
 
-        // Overflow check (x-axis)
-        if ((left * zoom) + tooltipRect.width > window.innerWidth) {
-            left = (window.innerWidth - tooltipRect.width - (20 * zoom)) / zoom;
-        }
-        if (left < 0) left = 20 / zoom;
-
-        this.tooltip.style.left = `${left}px`;
-        this.tooltip.style.top = `${top}px`;
-
-        // Scroll into view if needed
-        target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        this.panels.top.style.cssText = `top:0; left:0; width:100%; height:${t}px;`;
+        this.panels.bottom.style.cssText = `top:${t + h}px; left:0; width:100%; height:${vh - (t + h)}px;`;
+        this.panels.left.style.cssText = `top:${t}px; left:0; width:${l}px; height:${h}px;`;
+        this.panels.right.style.cssText = `top:${t}px; left:${l + w}px; width:${vw - (l + w)}px; height:${h}px;`;
     },
 
     next() {
@@ -161,7 +197,6 @@ const Tour = {
         this.overlay.classList.add('opacity-0');
         this.tooltip.classList.add('scale-95');
         document.body.style.overflow = '';
-
         setTimeout(() => {
             this.overlay.remove();
             localStorage.setItem('tour_completed', 'true');
