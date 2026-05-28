@@ -167,28 +167,34 @@ function analyzeText(text, originalName) {
     const upperText = cleanText.toUpperCase();
     const lines = cleanText.split('\n').map(l => l.trim()).filter(l => l);
 
-    // ========== 1. PPN Detection ==========
-    // Strategy: Search the ENTIRE text for PT. or CV., not just the "Kepada Yth" line
-    // OCR may produce "Kepada Yth", "KepadeYth", "Kepade Yth", etc.
+    // ========== 1. PPN Detection & Sectioning ==========
+    // We search for a recipient "Kepada Yth" section.
+    // If not found, we fallback to finding PT./CV. patterns elsewhere.
     let isPPN = false;
     let ythText = "";
+    let recipientSectionText = "";
 
-    // Try strict "Kepada Yth" first
-    const ythMatch = cleanText.match(/[Kk]epad[ae]\s*[Yy]th\s*[:.;]?\s*([^\n]+)/i);
+    // Robust Kepada Yth line find (handles common OCR typos like Kepade, KepadaYth)
+    const ythRegex = /[Kk]epad[ae]\s*[Yy]th\s*[:.;]?\s*([^\n]+)/i;
+    const ythMatch = cleanText.match(ythRegex);
+
     if (ythMatch) {
         ythText = ythMatch[1].trim().toUpperCase();
-        isPPN = ythText.includes("PT") || ythText.includes("CV");
+        // Sectioning: Take the yth line + next 2 lines (common recipient block)
+        const matchIdx = cleanText.indexOf(ythMatch[0]);
+        recipientSectionText = cleanText.substring(matchIdx, matchIdx + 150).toUpperCase(); // approx 3 lines
+        isPPN = ythText.match(/\b(P[TI]|CV|C[VF]|C[TY])\b/i) !== null;
     }
 
-    // Fallback: scan ALL lines for PT. or CV. pattern
+    // Fallback detection (if strict yth failed)
     if (!isPPN) {
-        for (const line of lines) {
-            const up = line.toUpperCase();
-            if (up.match(/\b(PT\.|CV\.)\s*\w/)) {
-                isPPN = true;
-                if (!ythText) ythText = up;
-                break;
-            }
+        // Look for any line containing PT. or CV. (with OCR typo support)
+        // Priority: Skip the first 10% of text to avoid letterheads
+        const midText = cleanText.substring(Math.floor(cleanText.length * 0.1));
+        const fallbackPT = midText.match(/\b(PT\.|CV\.|PI\.|CF\.|CT\.)\s*[A-Z]{3,}/i);
+        if (fallbackPT) {
+            isPPN = true;
+            if (!ythText) ythText = fallbackPT[0].toUpperCase();
         }
     }
     const type = isPPN ? 'PPN' : 'NON';
@@ -206,12 +212,17 @@ function analyzeText(text, originalName) {
     };
 
     if (isPPN) {
-        // IMPORTANT: Match PT against the Kepada Yth line FIRST (ythText),
-        // NOT the full text, to avoid matching the sender/letterhead company name.
-        let ptMatches = PT_MAPPING.filter(r => ythText.includes(r.pt.toUpperCase()));
+        // IMPORTANT: Match PT against the Recipient Section FIRST
+        // This is the most crucial part to avoid letterheads!
+        const searchScope = recipientSectionText || ythText || upperText.substring(Math.floor(upperText.length * 0.15));
 
-        // Fallback: if nothing found in ythText, try full text (but only as last resort)
+        let ptMatches = PT_MAPPING.filter(r => {
+            const ptName = r.pt.toUpperCase();
+            return searchScope.includes(ptName);
+        });
+
         if (ptMatches.length === 0) {
+            // Very loose fallback
             ptMatches = PT_MAPPING.filter(r => upperText.includes(r.pt.toUpperCase()));
         }
 
@@ -256,23 +267,32 @@ function analyzeText(text, originalName) {
     }
 
     // ========== 3. Nominal Detection ==========
-    // Try multiple patterns for OCR flexibility
     let nominal = "0";
+    // More aggressive patterns: look for large denominations or total-like structures
     const nominalPatterns = [
-        /[Tt]otal\s*[Bb]ayar\s*[:;.]?\s*([\d][[\d\.,\-\s]+)/,
-        /[Bb]ayar\s*[:;.]?\s*([\d][\d\.,\-\s]+)/,
-        /[Tt]otal\s*[:;.]?\s*([\d][\d\.,\-\s]+)/,
-        /Rp\.?\s*([\d][\d\.,\-\s]+)/i
+        /(?:Total|Bayar|Total\s*Bayar|Netto|Billed)\s*[:;.]?\s*Rp?[\s.]*([\d][\d\.,\-\s]{3,15})/i,
+        /Rp?[\s.]*([\d][\d\.,\-\s]{3,15})(?=\s*(?:Lunas|Bayar|Total))/i,
+        /([\d][\d\.,\-\s]{3,15})\s*(?=Total\s*Bayar)/i,
+        /Rp?[\s.]*([\d][\d\.,\-\s]{3,15})/i
     ];
+
+    // Find all potential candidates
+    let candidates = [];
     for (const pat of nominalPatterns) {
-        const m = cleanText.match(pat);
-        if (m) {
+        let regex = new RegExp(pat, 'gi');
+        let m;
+        while ((m = regex.exec(cleanText)) !== null) {
             let rawNum = m[1].split(',')[0].replace(/[^0-9]/g, '');
-            if (rawNum && Number(rawNum) > 0) {
-                nominal = Number(rawNum).toLocaleString('id-ID');
-                break;
+            if (rawNum && rawNum.length >= 4) { // Minimally 1.000
+                candidates.push(Number(rawNum));
             }
         }
+    }
+
+    if (candidates.length > 0) {
+        // Pick the HIGHEST number found (usually the grand total)
+        const highest = Math.max(...candidates);
+        nominal = highest.toLocaleString('id-ID');
     }
 
     // ========== 4. Date Detection ==========
