@@ -3,13 +3,12 @@
  * Uses Tesseract.js for OCR and regex for metadata extraction.
  */
 
-const PT_MAPPING = {
-    "CV DUNIA BAJA": "DUNIA_BAJA",
-    "MEGA BAJA BINTARO": "MB_BINTARO",
-    "CV. MEGA BAJA INDONESIA": "MB_INDONESIA",
-    "PT GARUDA GEMILANG INDONESIA": "GARUDA_ANKA",
-    "CV. DUNIA BAJA": "DUNIA_BAJA"
-};
+let PT_MAPPING = [
+    { pt: "CV DUNIA BAJA", secondary: "", store: "DUNIA_BAJA" },
+    { pt: "MEGA BAJA BINTARO", secondary: "", store: "MB_BINTARO" },
+    { pt: "PT GARUDA GEMILANG INDONESIA", secondary: "BEKASI", store: "GARUDA_BEKASI" },
+    { pt: "PT GARUDA GEMILANG INDONESIA", secondary: "BINTARO", store: "GARUDA_BINTARO" }
+];
 
 const MONTHS_MAP = {
     'JAN': '01', 'FEB': '02', 'MAR': '03', 'APR': '04', 'MEI': '05', 'MAY': '05',
@@ -27,22 +26,23 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function loadMapping() {
-    const saved = localStorage.getItem('pt_mapping');
+    const saved = localStorage.getItem('pt_mapping_v2');
     if (saved) {
         try {
-            const parsed = JSON.parse(saved);
-            Object.assign(PT_MAPPING, parsed);
-        } catch (e) { }
+            PT_MAPPING = JSON.parse(saved);
+        } catch (e) { console.warn("Failed to load mapping", e); }
     }
     renderMappingUI();
 }
 
 function renderMappingUI() {
     const list = document.getElementById('mapping-list');
-    list.innerHTML = Object.entries(PT_MAPPING).map(([pt, store]) => `
+    if (!list) return;
+
+    list.innerHTML = PT_MAPPING.map(rule => `
         <div class="p-3 rounded-xl bg-white/5 border border-white/5">
-            <p class="text-[10px] text-gray-500 mb-1">${pt}</p>
-            <p class="text-xs font-semibold text-indigo-400">${store}</p>
+            <p class="text-[10px] text-gray-500 mb-1">${rule.pt} ${rule.secondary ? `(${rule.secondary})` : ''}</p>
+            <p class="text-xs font-semibold text-indigo-400">${rule.store}</p>
         </div>
     `).join('');
 }
@@ -153,27 +153,42 @@ async function extractTextFromPDF(file) {
 
 function analyzeText(text, originalName) {
     console.log("[AI] Raw Text:", text);
+    const upperText = text.toUpperCase();
 
-    // 1. PPN Detection
-    // "Kepada Yth : PT."
+    // 1. Extract PT name line (Kepada Yth)
     const ythSection = text.match(/Kepada Yth\s*:\s*([^\n]+)/i);
-    const ythText = ythSection ? ythSection[1] : "";
-    const isPPN = ythText.toUpperCase().includes("PT.");
+    const ythText = ythSection ? ythSection[1].trim().toUpperCase() : "";
+    const isPPN = ythText.includes("PT.");
     const type = isPPN ? 'PPN' : 'NON';
 
-    // 2. Store Name Detection
+    // 2. Store Name Detection (Contextual)
     let detectedToko = "UNKNOWN";
 
     if (isPPN) {
-        // Look for PT in mapping
-        for (const [pt, store] of Object.entries(PT_MAPPING)) {
-            if (ythText.toUpperCase().includes(pt.toUpperCase())) {
-                detectedToko = store;
-                break;
+        // Find best matching rule
+        let bestMatch = null;
+        let highestPriority = -1;
+
+        for (const rule of PT_MAPPING) {
+            if (ythText.includes(rule.pt.toUpperCase())) {
+                // Priority 2: PT matches AND Secondary keyword matches
+                if (rule.secondary && upperText.includes(rule.secondary.toUpperCase())) {
+                    bestMatch = rule.store;
+                    highestPriority = 2;
+                    break; // Strongest match found
+                }
+                // Priority 1: PT matches (no secondary keyword required)
+                if (!rule.secondary && highestPriority < 1) {
+                    bestMatch = rule.store;
+                    highestPriority = 1;
+                }
             }
         }
-        // Fallback: If PT not in mapping, take the PT name
-        if (detectedToko === "UNKNOWN") {
+
+        if (bestMatch) {
+            detectedToko = bestMatch;
+        } else {
+            // Fallback: If PT not in mapping, take the PT name
             const ptMatch = ythText.match(/PT\.\s*([^,]+)/i);
             detectedToko = ptMatch ? ptMatch[1].trim() : "PT_UNKNOWN";
         }
@@ -196,14 +211,12 @@ function analyzeText(text, originalName) {
     }
 
     // 4. Date Detection
-    // "Tgl Cetak : 08-May-2026"
     const dateMatch = text.match(/Tgl Cetak\s*:\s*(\d{1,2})[-/\s]([A-Za-z]{3,9})/i);
     let dateStr = "00-Unknown";
     if (dateMatch) {
         const day = dateMatch[1];
         const rawMonth = dateMatch[2].substring(0, 3).toUpperCase();
 
-        // Month names in Indonesian for display
         const indMonthMap = {
             'JAN': 'Januari', 'FEB': 'Februari', 'MAR': 'Maret', 'APR': 'April',
             'MEI': 'Mei', 'MAY': 'Mei', 'JUN': 'Juni', 'JUL': 'Juli',
@@ -214,7 +227,6 @@ function analyzeText(text, originalName) {
         dateStr = `${day} ${month}`;
     }
 
-    // Format: PPN/NON - NAMA TOKO - NOMINAL - TANGGAL
     const suggestion = `${type} - ${detectedToko} - ${nominal} - ${dateStr}.pdf`;
 
     return {
@@ -298,11 +310,39 @@ function checkDownloadAll() {
 // ---- Mapping Editor ----
 function editMapping() {
     const modal = document.getElementById('mapping-modal');
-    const input = document.getElementById('mapping-input');
+    const body = document.getElementById('mapping-editor-body');
+    body.innerHTML = ''; // Clear
 
-    const text = Object.entries(PT_MAPPING).map(([pt, store]) => `${pt}:${store}`).join('\n');
-    input.value = text;
+    if (PT_MAPPING.length === 0) {
+        addMappingRow();
+    } else {
+        PT_MAPPING.forEach(rule => addMappingRow(rule.pt, rule.secondary, rule.store));
+    }
+
     modal.classList.remove('hidden');
+}
+
+function addMappingRow(pt = "", secondary = "", store = "") {
+    const body = document.getElementById('mapping-editor-body');
+    const row = document.createElement('tr');
+    row.className = 'group hover:bg-white/5 transition-all transition-all';
+    row.innerHTML = `
+        <td class="py-2 px-2">
+            <input type="text" placeholder="Contoh: PT. DUNIA BAJA" value="${pt}" class="w-full bg-transparent border-none outline-none text-xs text-white placeholder:text-gray-600 focus:ring-0">
+        </td>
+        <td class="py-2 px-2">
+            <input type="text" placeholder="Contoh: BEKASI" value="${secondary}" class="w-full bg-transparent border-none outline-none text-xs text-indigo-300 placeholder:text-gray-600 focus:ring-0">
+        </td>
+        <td class="py-2 px-2">
+            <input type="text" placeholder="Contoh: MB_BEKASI" value="${store}" class="w-full bg-transparent border-none outline-none text-xs text-emerald-400 placeholder:text-gray-600 focus:ring-0 font-bold">
+        </td>
+        <td class="py-2 px-2 text-right">
+            <button onclick="this.closest('tr').remove()" class="p-1.5 rounded-lg text-gray-600 hover:text-red-400 hover:bg-red-400/10 transition-all opacity-0 group-hover:opacity-100">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+            </button>
+        </td>
+    `;
+    body.appendChild(row);
 }
 
 function closeMapping() {
@@ -310,18 +350,28 @@ function closeMapping() {
 }
 
 function saveMapping() {
-    const input = document.getElementById('mapping-input').value;
-    const lines = input.split('\n').filter(l => l.includes(':'));
-    const newMap = {};
+    const rows = document.querySelectorAll('#mapping-editor-body tr');
+    const newRules = [];
 
-    lines.forEach(line => {
-        const [pt, store] = line.split(':').map(s => s.trim());
-        if (pt && store) newMap[pt] = store;
+    rows.forEach(row => {
+        const inputs = row.querySelectorAll('input');
+        const pt = inputs[0].value.trim();
+        const secondary = inputs[1].value.trim();
+        const store = inputs[2].value.trim();
+
+        if (pt && store) {
+            newRules.push({ pt, secondary, store });
+        }
     });
 
-    Object.assign(PT_MAPPING, newMap);
-    localStorage.setItem('pt_mapping', JSON.stringify(newMap));
+    PT_MAPPING = newRules;
+    localStorage.setItem('pt_mapping_v2', JSON.stringify(PT_MAPPING));
     renderMappingUI();
     closeMapping();
-    Toast.success('Pemetaan berhasil disimpan!');
+
+    if (typeof Toast !== 'undefined') {
+        Toast.success('Pemetaan berhasil disimpan!');
+    } else {
+        alert('Pemetaan berhasil disimpan!');
+    }
 }

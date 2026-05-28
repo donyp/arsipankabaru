@@ -184,20 +184,46 @@
         </div>
     </div>
 
-    <!-- Modals -->
+    <!-- Mapping Modal -->
     <div id="mapping-modal"
-        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm hidden">
-        <div class="premium-card rounded-3xl p-8 w-full max-w-lg">
-            <h3 class="text-xl font-bold text-white mb-2">Edit Pemetaan PT ➔ Toko</h3>
-            <p class="text-sm text-gray-400 mb-6">Gunakan format <code>NAMA PT:NAMA TOKO</code> per baris.</p>
-            <textarea id="mapping-input"
-                class="w-full h-64 bg-[#0f172a] border border-white/10 rounded-2xl p-4 text-sm font-mono text-gray-300 outline-none focus:border-indigo-500/50 transition-all"></textarea>
-            <div class="flex gap-3 mt-6">
+        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md hidden">
+        <div class="premium-card rounded-3xl p-8 w-full max-w-4xl max-h-[85vh] flex flex-col">
+            <div class="flex items-center justify-between mb-2">
+                <h3 class="text-xl font-bold text-white">Konfigurasi Pemetaan Pintar</h3>
+                <button onclick="addMappingRow()"
+                    class="px-4 py-2 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 text-xs font-bold transition-all border border-indigo-500/20 flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                    </svg>
+                    Tambah Aturan
+                </button>
+            </div>
+            <p class="text-sm text-gray-400 mb-6">Gunakan <strong>Kata Kunci Sekunder</strong> (misal: nama penerima)
+                jika satu PT melayani banyak toko.</p>
+
+            <div class="flex-1 overflow-y-auto mb-6 pr-2 custom-scrollbar">
+                <table class="w-full text-left">
+                    <thead>
+                        <tr class="text-[10px] text-gray-500 uppercase tracking-wider border-b border-white/5">
+                            <th class="pb-3 px-2 font-medium">Nama PT (Utama)</th>
+                            <th class="pb-3 px-2 font-medium">Kata Kunci Sekunder (Opsional)</th>
+                            <th class="pb-3 px-2 font-medium">Nama Toko Tujuan</th>
+                            <th class="pb-3 px-2 text-right">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody id="mapping-editor-body" class="divide-y divide-white/5">
+                        <!-- Rows will be injected here -->
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="flex gap-3 pt-4 border-t border-white/5">
                 <button onclick="closeMapping()"
                     class="flex-1 py-3 rounded-2xl bg-white/5 text-gray-400 font-bold hover:bg-white/10 transition-all">Batal</button>
                 <button onclick="saveMapping()"
-                    class="flex-1 py-3 rounded-2xl bg-indigo-600 text-white font-bold hover:bg-indigo-500 transition-all">Simpan
-                    Perubahan</button>
+                    class="flex-1 py-3 rounded-2xl bg-indigo-600 text-white font-bold hover:bg-indigo-500 shadow-lg shadow-indigo-600/20 transition-all">Simpan
+                    Pemetaan</button>
             </div>
         </div>
     </div>
