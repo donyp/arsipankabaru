@@ -206,11 +206,14 @@ function analyzeText(text, originalName) {
     };
 
     if (isPPN) {
-        // Search mapping against the FULL text (not just ythText) for PT name matching
-        const ptMatches = PT_MAPPING.filter(r => {
-            const ptName = r.pt.toUpperCase();
-            return upperText.includes(ptName);
-        });
+        // IMPORTANT: Match PT against the Kepada Yth line FIRST (ythText),
+        // NOT the full text, to avoid matching the sender/letterhead company name.
+        let ptMatches = PT_MAPPING.filter(r => ythText.includes(r.pt.toUpperCase()));
+
+        // Fallback: if nothing found in ythText, try full text (but only as last resort)
+        if (ptMatches.length === 0) {
+            ptMatches = PT_MAPPING.filter(r => upperText.includes(r.pt.toUpperCase()));
+        }
 
         if (ptMatches.length === 1) {
             const rule = ptMatches[0];
@@ -233,8 +236,9 @@ function analyzeText(text, originalName) {
                 fallbackCause = `PT ini memiliki ${ptMatches.length} cabang. Gagal mencocokkan kata kunci sekunder.`;
             }
         } else {
-            // Fallback: If PT/CV not in mapping, extract PT/CV name from text
-            const ptExtract = upperText.match(/(?:PT|CV)[.\s]+([A-Z][A-Z0-9\s]{2,30})/);
+            // Fallback: If PT/CV not in mapping, extract PT/CV name from ythText first, then full text
+            const extractFrom = ythText || upperText;
+            const ptExtract = extractFrom.match(/(?:PT|CV)[.\s]+([A-Z][A-Z0-9\s]{2,30})/);
             detectedToko = ptExtract ? ptExtract[1].trim() : "PT_UNKNOWN";
             if (detectedToko !== "PT_UNKNOWN") {
                 needsReview = true;
