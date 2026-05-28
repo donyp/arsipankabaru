@@ -166,7 +166,7 @@ function analyzeText(text, originalName) {
     // 1. Extract PT name line (Kepada Yth)
     const ythSection = text.match(/Kepada Yth\s*:\s*([^\n]+)/i);
     const ythText = ythSection ? ythSection[1].trim().toUpperCase() : "";
-    const isPPN = ythText.includes("PT.");
+    const isPPN = ythText.includes("PT.") || ythText.includes("CV.");
     const type = isPPN ? 'PPN' : 'NON';
 
     // 2. Store Name Detection (Contextual)
@@ -201,8 +201,8 @@ function analyzeText(text, originalName) {
                 fallbackCause = `PT ini memiliki ${ptMatches.length} cabang tujuan. Sistem gagal mencari kata kunci sekunder yang unik.`;
             }
         } else {
-            // Fallback: If PT not in mapping, take the PT name
-            const ptMatch = ythText.match(/PT\.\s*([^,]+)/i);
+            // Fallback: If PT/CV not in mapping, take the PT/CV name
+            const ptMatch = ythText.match(/(?:PT|CV)\.\s*([^,]+)/i);
             detectedToko = ptMatch ? ptMatch[1].trim() : "PT_UNKNOWN";
             if (detectedToko !== "PT_UNKNOWN") {
                 needsReview = true;
