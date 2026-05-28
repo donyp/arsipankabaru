@@ -178,27 +178,30 @@ function analyzeText(text, originalName) {
         // Find all rules matching the PT
         const ptMatches = PT_MAPPING.filter(r => ythText.includes(r.pt.toUpperCase()));
 
+        const checkSecondary = (rule, text) => {
+            if (!rule.secondary) return false;
+            const keywords = rule.secondary.split(',').map(k => k.trim().toUpperCase());
+            return keywords.some(k => text.includes(k));
+        };
+
         if (ptMatches.length === 1) {
-            // Only 1 rule for this PT, use it directly (if secondary is filled, ideally it should match, but we trust the single mapping)
             const rule = ptMatches[0];
-            if (rule.secondary && !upperText.includes(rule.secondary.toUpperCase())) {
+            if (rule.secondary && !checkSecondary(rule, upperText)) {
                 detectedToko = "Cek Manual (Secondary Tidak Cocok)";
                 needsReview = true;
-                fallbackCause = `PT '${rule.pt}' terdeteksi, tapi kata kunci sekunder '${rule.secondary}' tidak ditemukan.`;
+                fallbackCause = `PT '${rule.pt}' terdeteksi, tapi kata kunci sekunder '${rule.secondary}' tidak ada.`;
             } else {
                 detectedToko = rule.store;
             }
         } else if (ptMatches.length > 1) {
-            // Multiple rules for this PT. Must disambiguate via secondary keyword!
-            const exactMatches = ptMatches.filter(r => r.secondary && upperText.includes(r.secondary.toUpperCase()));
+            const exactMatches = ptMatches.filter(r => checkSecondary(r, upperText));
 
             if (exactMatches.length === 1) {
                 detectedToko = exactMatches[0].store;
             } else {
-                // Ambiguous! More than one matched, or NONE matched secondary keyword.
                 detectedToko = "Cek Manual (Ambigu)";
                 needsReview = true;
-                fallbackCause = `PT ini memiliki ${ptMatches.length} cabang tujuan. Sistem gagal mencari kata kunci sekunder yang unik.`;
+                fallbackCause = `PT ini memiliki ${ptMatches.length} cabang. Sistem gagal mencari kata kunci sekunder yang unik.`;
             }
         } else {
             // Fallback: If PT/CV not in mapping, take the PT/CV name
@@ -220,11 +223,11 @@ function analyzeText(text, originalName) {
     }
 
     // 3. Nominal Detection
-    // "Total Bayar : 4.935.190,00,-"
     const nominalMatch = text.match(/Total Bayar\s*:\s*([\d\.,\-]+)/i);
     let nominal = "0";
     if (nominalMatch) {
-        nominal = nominalMatch[1].split(',')[0].replace(/[^0-9]/g, '');
+        let rawNum = nominalMatch[1].split(',')[0].replace(/[^0-9]/g, '');
+        nominal = Number(rawNum).toLocaleString('id-ID'); // e.g. 390000 -> 390.000
     }
 
     // 4. Date Detection
@@ -244,7 +247,7 @@ function analyzeText(text, originalName) {
         dateStr = `${day} ${month}`;
     }
 
-    const suggestion = `${type} - ${detectedToko} - ${nominal} - ${dateStr}.pdf`;
+    const suggestion = `${type} ${detectedToko} ${nominal} ${dateStr}.pdf`.replace(/\s+/g, ' ');
 
     return {
         toko: detectedToko,
