@@ -438,9 +438,15 @@ function analyzeText(text, originalName) {
             if (exactMatches.length === 1) {
                 detectedToko = exactMatches[0].store;
             } else {
-                detectedToko = "Cek Manual (Ambigu)";
+                // If mapping fails, try to extract 'BPK/IBU' from recipient block explicitly
+                const bpkMatch = recipientSectionText.match(/(?:BPK|IBU|BAPAK|SDR|ATTN|UP)\s*[.:,]*\s*([A-Z\s]{3,20})/i);
+                if (bpkMatch) {
+                    detectedToko = `Cek Manual (${bpkMatch[1].trim()})`;
+                } else {
+                    detectedToko = "Cek Manual (Ambigu)";
+                }
                 needsReview = true;
-                fallbackCause = `${ptMatches.length} toko memiliki PT yang sama. Cek nama BPK/IBU.`;
+                fallbackCause = `${ptMatches.length} toko memiliki PT yang sama. Cek nama penerima.`;
             }
         } else {
             // No mapping found. Use the manually extracted PT name
@@ -585,9 +591,8 @@ function analyzeText(text, originalName) {
     // ========== 4. Date Detection ==========
     let dateStr = "00-Unknown";
     const datePatterns = [
-        /[Cc]etak\s*[:;.]?\s*(\d{1,2})\s*[-/\s.,]+\s*([A-Za-z]{3,9}|\d{1,2})/,
-        /[Tt]anggal\s*[:;.]?\s*(\d{1,2})\s*[-/\s.,]+\s*([A-Za-z]{3,9}|\d{1,2})/,
-        /\b(\d{1,2})\s*[-/]\s*([A-Za-z]{3,9}|\d{1,2})\s*[-/]\s*(\d{4})\b/
+        /(?:[Cc]etak|[Tt]gl|[Tt]anggal)\s*[:;.]?\s*(\d{1,2})\s*[-/\s.,]+\s*([A-Za-z]{3,9}|\d{1,2})/i,
+        /\b(\d{1,2})\s*[-/]\s*([A-Za-z]{3,9}|\d{1,2})\s*[-/]\s*(\d{4})\b/i
     ];
     for (const pat of datePatterns) {
         const m = cleanText.match(pat);
