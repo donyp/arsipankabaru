@@ -331,9 +331,10 @@ function analyzeText(text, originalName) {
     // Strategy 4: (Ultimate Fallback) Terbilang Parser
     // Often amounts are explicitly spelled out as "empat juta sembilan ratus ribu rupiah"
     if (candidates.length === 0 || Math.max(...candidates) < 1000) {
-        // Use [^0-9]{10,150} to allow multiline matching (OCR often breaks this into multiple lines)
-        const terbilangMatch = cleanText.match(/(?:[Tt]erbilang|[Tt]erbilang\s*:)\s*([^0-9]{10,150})(?:rupiah|rp|$)/i);
-        if (terbilangMatch) {
+        // Find index of the word 'terbilang' and grab the next 150 characters (ignores newlines and noise)
+        const tIdx = cleanText.toLowerCase().indexOf('terbilang');
+        if (tIdx !== -1) {
+            const rawTerbilangText = cleanText.substring(tIdx, tIdx + 150);
             let parseTerbilang = (text) => {
                 const map = {
                     'satu': 1, 'se': 1, 'dua': 2, 'tiga': 3, 'empat': 4, 'lima': 5,
@@ -361,7 +362,7 @@ function analyzeText(text, originalName) {
                 }
                 return total;
             };
-            const tbVal = parseTerbilang(terbilangMatch[1]);
+            const tbVal = parseTerbilang(rawTerbilangText);
             if (tbVal > 0) candidates.push(tbVal);
         }
     }
@@ -381,7 +382,7 @@ function analyzeText(text, originalName) {
     for (const pat of datePatterns) {
         const m = cleanText.match(pat);
         if (m) {
-            const day = m[1];
+            const day = parseInt(m[1], 10).toString(); // removes leading zero if present
             const rawMonth = m[2].substring(0, 3).toUpperCase();
             const indMonthMap = {
                 'JAN': 'Januari', 'FEB': 'Februari', 'MAR': 'Maret', 'APR': 'April',
