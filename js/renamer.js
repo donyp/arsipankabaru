@@ -344,15 +344,20 @@ function analyzeText(text, originalName) {
             return rule.secondary.split(',').some(k => {
                 const cleanK = k.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
                 if (!cleanK) return false;
-                // Match if keyword is in text OR text fragment (normalized) contains keyword
                 return cleanTxt.includes(cleanK) || cleanK.includes(cleanTxt);
             });
         };
         const getPTMatch = (scope) => {
             const cleanScope = scope.replace(/[^A-Z0-9]/g, '');
             return PT_MAPPING.filter(r => {
-                const cleanPt = r.pt.replace(/\b(PT\.?|P[TI1]\.?|CV\.?|[O0C][VF]\.?|C[TY7]\.?|NV\.?|C[TN1]\.?)\b/gi, '').replace(/[^A-Z0-9]/g, '').toUpperCase();
-                return cleanPt.length > 2 && (cleanScope.includes(cleanPt) || cleanPt.includes(cleanScope));
+                const name = r.pt.replace(/\b(PT\.?|P[TI1]\.?|CV\.?|[O0C][VF]\.?|C[TY7]\.?|NV\.?|C[TN1]\.?)\b/gi, '').toUpperCase();
+                const tokens = name.split(/\s+/).filter(t => t.length > 2);
+                if (tokens.length === 0) return false;
+
+                // If 70% of words or at least 2 significant words match
+                const matchedTokens = tokens.filter(t => cleanScope.includes(t.replace(/[^A-Z0-9]/g, '')));
+                const ratio = matchedTokens.length / tokens.length;
+                return ratio >= 0.7 || (tokens.length > 2 && matchedTokens.length >= 2);
             });
         };
 
@@ -361,17 +366,24 @@ function analyzeText(text, originalName) {
             let matches = getPTMatch(scope).filter(r => !r.pt.includes("GARUDA GEMILANG"));
             if (matches.length === 0) matches = getPTMatch(upperText).filter(r => !r.pt.includes("GARUDA GEMILANG"));
 
+            // GLOBAL FALLBACK: If still unknown, scan entire document for Store Names directly
+            if (matches.length === 0) {
+                const cleanFull = upperText.replace(/[^A-Z0-9]/g, '');
+                matches = PT_MAPPING.filter(r => {
+                    const cleanStore = r.store.toUpperCase().replace(/[^A-Z0-9]/g, '');
+                    return cleanStore.length > 3 && cleanFull.includes(cleanStore);
+                });
+            }
+
             if (matches.length === 1) {
                 const rule = matches[0];
                 store = rule.store;
                 if (rule.secondary && !checkSec(rule, upperText)) {
-                    review = true; cause = `PT '${rule.pt}' OK, tapi '${rule.secondary}' tidak ditemukan.`;
+                    review = true; cause = `PT OK, tapi '${rule.secondary}' tidak ditemukan.`;
                 }
             } else if (matches.length > 1) {
-                // Disambiguate: search the WHOLE document for secondary names
+                // Disambiguate
                 let exact = matches.filter(r => checkSec(r, upperText));
-
-                // If secondary fails, check if the STORE NAME itself is mentioned in text
                 if (exact.length === 0) {
                     exact = matches.filter(r => {
                         const cleanStore = r.store.toUpperCase().replace(/[^A-Z0-9]/g, '');
@@ -383,10 +395,7 @@ function analyzeText(text, originalName) {
                     store = exact[0].store;
                 } else {
                     const bpk = cleanText.match(/(?:BPK|IBU|BAPAK|SDR|ATTN|UP|BP|PENERIMA)[.,:\s]+([A-Z\s]{3,20})/i);
-                    // Fallback to first match if we can't decide, but keep review flag
-                    if (exact.length > 1) store = exact[0].store;
-                    else store = matches[0].store;
-
+                    store = exact.length > 1 ? exact[0].store : matches[0].store;
                     review = true;
                     cause = bpk ? `Cabang Ambigu, Deteksi: ${bpk[1].trim()}` : `${matches.length} cabang PT sama.`;
                 }
