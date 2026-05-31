@@ -1,6 +1,6 @@
 /**
- * AI PDF Renamer Logic - v1.0
- * Uses Tesseract.js for OCR and regex for metadata extraction.
+ * AI PDF Renamer Logic - v2.0
+ * Ultra-robust metadata extraction for MEGA BAJA invoices.
  */
 
 let PT_MAPPING = [
@@ -39,7 +39,7 @@ let PT_MAPPING = [
     { store: "Mega Warna kalimalang", secondary: "EDI", pt: "PT. MEGA WARNA Indonesia" },
 
     // ZONA 4
-    { store: "Bantar Gebang", secondary: "LILIS, ANTO, NEGA, MITA", pt: "CV. DUNIA BAJA" },
+    { store: "Bantar Gebang", secondary: "LILIS, ANTO, NEGA, MITA, DENI", pt: "CV. DUNIA BAJA" },
     { store: "Cibubur", secondary: "ANWAR", pt: "CV. CILEGON STEEL" },
     { store: "Cikeas", secondary: "RUDIYANTO", pt: "PT CIBUBUR RAYA INDOSTEEL (CIKEAS)" },
     { store: "Cimanggis", secondary: "BAHTIAR, YUNUS", pt: "PT. TRIGALUH MAS CIMANGGIS" },
@@ -255,16 +255,11 @@ async function processQueue() {
     processQueue();
 }
 
-/**
- * Extracts text from PDF.
- * Uses pdf.js first, falls back to Tesseract OCR if text is empty (scanned image).
- */
 async function extractTextFromPDF(file) {
     const arrayBuffer = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
     let fullText = "";
 
-    // Try text extraction first
     for (let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i);
         const content = await page.getTextContent();
@@ -272,12 +267,11 @@ async function extractTextFromPDF(file) {
         fullText += pageText + "\n";
     }
 
-    // If text is minimal or missing key anchor words, it's likely a scan. Use OCR on first page.
     const lowerText = fullText.toLowerCase();
     if (fullText.trim().length < 50 || (!lowerText.includes('yth') && !lowerText.includes('bayar'))) {
-        console.log(`[AI] Page text too short or garbled (${fullText.length}), trigger OCR fallback...`);
+        console.log(`[AI] Page text too short, using OCR...`);
         const page = await pdf.getPage(1);
-        const viewport = page.getViewport({ scale: 3.0 }); // Higher scale for better OCR on full A4
+        const viewport = page.getViewport({ scale: 2.5 });
         const canvas = document.createElement('canvas');
         const context = canvas.getContext('2d');
         canvas.height = viewport.height;
@@ -290,393 +284,181 @@ async function extractTextFromPDF(file) {
         });
         fullText = text;
     }
-
     return fullText;
 }
 
 function analyzeText(text, originalName) {
-    console.log("[AI] Raw Text:", text);
-    // Normalize OCR quirks: collapse multiple spaces, fix common OCR errors
-    const cleanText = text.replace(/\r/g, '').replace(/[ \t]+/g, ' ');
-    const upperText = cleanText.toUpperCase();
-    const lines = cleanText.split('\n').map(l => l.trim()).filter(l => l);
+    try {
+        const cleanText = text.replace(/\r/g, '').replace(/[ \t]+/g, ' ');
+        const upperText = cleanText.toUpperCase();
 
-    // ========== 1. PPN / NON Detection ==========
-    // Rules:
-    //   PPN = detected from PT./CV. in "Kepada Yth:" (EXCEPT PT. GARUDA GEMILANG) OR Invoice contains "8351003100"
-    //   NON = detected when "Kepada Yth:" is directly followed by "MEGA BAJA X" (no PT.) OR Invoice contains "8351003110"
-    let isPPN = false;
-    let isNON = false;
-    let ythText = "";
-    let recipientSectionText = "";
+        // 1. PPN/NON
+        let isPPN = false;
+        let isNON = false;
+        let ythText = "";
+        let recSecText = "";
 
-    // Step 1a: Find "Kepada Yth" line
-    const ythRegex = /[Kk]epad[ae]\s*[Yy]th\s*[:.;]?\s*([^\n]+)/i;
-    const ythMatch = cleanText.match(ythRegex);
-
-    if (ythMatch) {
-        ythText = ythMatch[1].trim().toUpperCase();
-        const matchIdx = cleanText.indexOf(ythMatch[0]);
-        recipientSectionText = cleanText.substring(matchIdx, matchIdx + 250).toUpperCase();
-    }
-
-    // Step 1b: Check Invoice number for definitive PPN/NON signal
-    const invoiceMatch = cleanText.match(/[Ii]nvoice\s*[:;.]?\s*([\d]+)/);
-    const invoiceNum = invoiceMatch ? invoiceMatch[1] : "";
-
-    if (invoiceNum.startsWith("8351003110")) {
-        isPPN = true;
-    } else if (invoiceNum.startsWith("8351003100")) {
-        isNON = true;
-    }
-
-    // Step 1c: If invoice didn't decide, use "Kepada Yth" content
-    if (!isPPN && !isNON && ythText) {
-        // Check if ythText contains PT./CV. (with OCR typo support: OV, PI, P1, CF, C7)
-        const hasPT = ythText.match(/\b(PT\.?|P[TI1]\.?|CV\.?|[O0C][VF]\.?|C[TY7]\.?)\s/i);
-        if (hasPT) {
-            // It's PPN... UNLESS it's PT. GARUDA GEMILANG (that's the sender, not recipient)
-            const isGaruda = ythText.match(/GARUDA\s*GEMILANG/i);
-            if (isGaruda) {
-                // Garuda Gemilang is the SENDER company, not the recipient. This is likely an error in OCR.
-                // Treat as unknown, check further in the recipient block
-                const recipientHasOtherPT = recipientSectionText.replace(/GARUDA\s*GEMILANG[^\n]*/gi, '').match(/\b(PT\.?|CV\.?)\s*[A-Z]{3,}/i);
-                if (recipientHasOtherPT) {
-                    isPPN = true;
-                } else {
-                    // Check for MEGA BAJA pattern in recipient
-                    const megaBajaInRecipient = recipientSectionText.match(/MEGA\s*BAJA\s+([A-Z0-9]+)/);
-                    if (megaBajaInRecipient) {
-                        isNON = true;
-                    }
-                }
-            } else {
-                isPPN = true;
-            }
-        } else {
-            // No PT/CV found after Kepada Yth → Check for "MEGA BAJA X" pattern → NON
-            const megaBajaMatch = ythText.match(/MEGA\s*BAJA/i);
-            if (megaBajaMatch) {
-                isNON = true;
-            }
+        const ythMatch = cleanText.match(/[Kk]epad[ae]\s*[Yy]th\s*[:.;]?\s*([^\n]+)/i);
+        if (ythMatch) {
+            ythText = ythMatch[1].trim().toUpperCase();
+            const idx = cleanText.indexOf(ythMatch[0]);
+            recSecText = cleanText.substring(idx, idx + 400).toUpperCase();
         }
-    }
 
-    // Step 1d: Final fallback — scan full text for PT/CV if still undecided
-    if (!isPPN && !isNON) {
-        // Skip first 10% (letterhead area) and look for PT./CV.
-        const midText = cleanText.substring(Math.floor(cleanText.length * 0.1)).toUpperCase();
-        const fallbackPT = midText.match(/\b(PT\.?|CV\.?)\s*[A-Z]{3,}/i);
-        if (fallbackPT && !fallbackPT[0].match(/GARUDA\s*GEMILANG/i)) {
-            isPPN = true;
+        const invMatch = cleanText.match(/[Ii]nvoice\s*[:;.]?\s*([\d]+)/);
+        const invNum = invMatch ? invMatch[1] : "";
+        if (invNum.startsWith("8351003110")) isPPN = true;
+        else if (invNum.startsWith("8351003100")) isNON = true;
+
+        if (!isPPN && !isNON && ythText) {
+            const hasPT = ythText.match(/\b(PT\.?|P[TI1]\.?|CV\.?|[O0C][VF]\.?|C[TY7]\.?)\s/i);
+            if (hasPT) {
+                if (ythText.includes("GARUDA GEMILANG")) {
+                    const otherPT = recSecText.replace(/GARUDA\s*GEMILANG[^\n]*/gi, '').match(/\b(PT\.?|CV\.?)\s*[A-Z]{3,}/i);
+                    if (otherPT) isPPN = true;
+                    else if (recSecText.includes("MEGA BAJA")) isNON = true;
+                } else isPPN = true;
+            } else if (ythText.includes("MEGA BAJA")) isNON = true;
         }
-    }
 
-    const type = isPPN ? 'PPN' : 'NON';
+        const type = isPPN ? 'PPN' : 'NON';
 
-    // ========== 2. Store Name Detection ==========
-    let detectedToko = "UNKNOWN";
-    let needsReview = false;
-    let fallbackCause = "";
+        // 2. Store
+        let store = "UNKNOWN";
+        let review = false;
+        let cause = "";
 
-    // Helper: check if any comma-separated secondary keyword is found in text
-    const checkSecondary = (rule, searchText) => {
-        if (!rule.secondary) return false;
-        const keywords = rule.secondary.split(',').map(k => k.trim().toUpperCase()).filter(k => k);
-        return keywords.some(k => searchText.includes(k));
-    };
-
-    // Helper: find mapping matches by stripping PT/CV from mapping key
-    const findPTMatches = (scope) => {
-        return PT_MAPPING.filter(r => {
-            const cleanPtName = r.pt.replace(/\b(PT\.?|CV\.?)\b/gi, '').replace(/[()]/g, '').trim().toUpperCase();
-            if (!cleanPtName || cleanPtName.length < 3) return false;
-            return scope.includes(cleanPtName);
+        const checkSec = (rule, txt) => {
+            if (!rule.secondary) return false;
+            return rule.secondary.split(',').some(k => txt.includes(k.trim().toUpperCase()));
+        };
+        const getPTMatch = (scope) => PT_MAPPING.filter(r => {
+            const clean = r.pt.replace(/\b(PT\.?|CV\.?)\b/gi, '').replace(/[()]/g, '').trim().toUpperCase();
+            return clean.length > 2 && scope.includes(clean);
         });
-    };
 
-    if (isPPN) {
-        // ----- PPN PATH: Look for PT/CV name in recipient, match against mapping -----
-        const searchScope = recipientSectionText || ythText || upperText.substring(Math.floor(upperText.length * 0.15));
+        if (isPPN) {
+            const scope = recSecText || ythText || upperText.substring(Math.floor(upperText.length * 0.15));
+            let matches = getPTMatch(scope).filter(r => !r.pt.includes("GARUDA GEMILANG"));
+            if (matches.length === 0) matches = getPTMatch(upperText).filter(r => !r.pt.includes("GARUDA GEMILANG"));
 
-        let ptMatches = findPTMatches(searchScope);
-        // Filter out GARUDA GEMILANG matches (sender company)
-        ptMatches = ptMatches.filter(r => !r.pt.match(/GARUDA\s*GEMILANG/i));
-
-        if (ptMatches.length === 0) {
-            // Very loose fallback: search full text
-            ptMatches = findPTMatches(upperText).filter(r => !r.pt.match(/GARUDA\s*GEMILANG/i));
-        }
-
-        let rawExtract = null;
-        if (ptMatches.length === 0) {
-            const extractFrom = ythText || upperText.substring(Math.floor(upperText.length * 0.15));
-            const ptMatchRegex = extractFrom.match(/(?:PT|CV|OV|PI)[.\s]+([A-Z][A-Z0-9\s]{3,30})/);
-            if (ptMatchRegex) {
-                rawExtract = ptMatchRegex[1].trim();
-                ptMatches = PT_MAPPING.filter(r => {
-                    const cleanMap = r.pt.replace(/\b(PT\.?|CV\.?)\b/gi, '').replace(/[()]/g, '').trim().toUpperCase();
-                    if (!cleanMap || cleanMap.length < 3) return false;
-                    return cleanMap.includes(rawExtract) || rawExtract.includes(cleanMap);
-                });
-            }
-        }
-
-        if (ptMatches.length === 1) {
-            const rule = ptMatches[0];
-            if (rule.secondary && !checkSecondary(rule, upperText)) {
-                // PT found but secondary keyword missing — still use it but flag
-                detectedToko = rule.store;
-                needsReview = true;
-                fallbackCause = `PT '${rule.pt}' terdeteksi. Kata kunci sekunder '${rule.secondary}' tidak ditemukan.`;
-            } else {
-                detectedToko = rule.store;
-            }
-        } else if (ptMatches.length > 1) {
-            // Multiple rules matched. Disambiguate via secondary keyword (BPK/IBU names)
-            const exactMatches = ptMatches.filter(r => checkSecondary(r, upperText));
-            if (exactMatches.length === 1) {
-                detectedToko = exactMatches[0].store;
-            } else {
-                // If mapping fails, try to extract 'BPK/IBU/BP' from recipient block explicitly
-                const bpkMatch = cleanText.match(/(?:BPK|IBU|BAPAK|SDR|ATTN|UP|BP|PENERIMA)[.,:\s]+([A-Z\s]{3,20})/i);
-                if (bpkMatch && !bpkMatch[1].match(/DENI/i) === false) { // sanity logic removed
-                    detectedToko = `Cek Manual (${bpkMatch[1].trim()})`;
-                } else if (bpkMatch) {
-                    detectedToko = `Cek Manual (${bpkMatch[1].trim()})`;
-                } else {
-                    detectedToko = "Cek Manual (Ambigu)";
+            if (matches.length === 1) {
+                store = matches[0].store;
+                if (matches[0].secondary && !checkSec(matches[0], upperText)) {
+                    review = true; cause = `PT '${matches[0].pt}' OK, tapi '${matches[0].secondary}' tidak ada.`;
                 }
-                needsReview = true;
-                fallbackCause = `${ptMatches.length} toko memiliki PT yang sama. Cek nama penerima.`;
+            } else if (matches.length > 1) {
+                const exact = matches.filter(r => checkSec(r, upperText));
+                if (exact.length === 1) store = exact[0].store;
+                else {
+                    const bpk = cleanText.match(/(?:BPK|IBU|BAPAK|SDR|ATTN|UP|BP|PENERIMA)[.,:\s]+([A-Z\s]{3,20})/i);
+                    store = bpk ? `Cek Manual (${bpk[1].trim()})` : "Cek Manual (Ambigu)";
+                    review = true; cause = `${matches.length} cabang PT sama.`;
+                }
             }
         } else {
-            // No mapping found. Use the manually extracted PT name
-            detectedToko = rawExtract || "PT_UNKNOWN";
-            if (detectedToko !== "PT_UNKNOWN") {
-                needsReview = true;
-                fallbackCause = `Pemetaan untuk '${detectedToko}' belum ada di sistem.`;
-            }
-        }
-    } else {
-        // ----- NON PATH: "MEGA BAJA X" → extract city name -----
-        // First try to extract from "Kepada Yth" line
-        const megaBajaSource = ythText || recipientSectionText || upperText;
-        const mbMatch = megaBajaSource.match(/MEGA\s*BAJA\s+([A-Z0-9][A-Z0-9\s]*)/i);
-
-        if (mbMatch) {
-            const cityRaw = mbMatch[1].trim().split(/\s+/)[0]; // Take first word as city
-            // Try to find in mapping by store name
-            const storeMatch = PT_MAPPING.find(r => r.store.toUpperCase() === cityRaw.toUpperCase());
-            if (storeMatch) {
-                detectedToko = storeMatch.store;
-            } else {
-                // Check secondary keywords (BPK/IBU) for disambiguation
-                const secondaryMatches = PT_MAPPING.filter(r => checkSecondary(r, upperText));
-                if (secondaryMatches.length === 1) {
-                    detectedToko = secondaryMatches[0].store;
-                } else {
-                    detectedToko = cityRaw;
-                    // Check if cityRaw partially matches any store name
-                    const partialMatch = PT_MAPPING.find(r => r.store.toUpperCase().includes(cityRaw.toUpperCase()));
-                    if (partialMatch) {
-                        detectedToko = partialMatch.store;
-                    }
+            const mMatch = (ythText || recSecText || upperText).match(/MEGA\s*BAJA\s+([A-Z0-9][A-Z0-9\s]*)/i);
+            if (mMatch) {
+                const city = mMatch[1].trim().split(/\s+/)[0];
+                const rule = PT_MAPPING.find(r => r.store.toUpperCase() === city.toUpperCase());
+                if (rule) store = rule.store;
+                else {
+                    const sec = PT_MAPPING.filter(r => checkSec(r, upperText));
+                    store = sec.length === 1 ? sec[0].store : city;
                 }
             }
-        } else if (ythText) {
-            // No MEGA BAJA pattern — try direct name from Yth line
-            const cleanYth = ythText.replace(/^(BPK|IBU|BAPAK)\s*/i, '').trim();
-            detectedToko = cleanYth.split(/[,\n]/)[0].trim() || "UNKNOWN";
         }
-    }
 
-    // ========== 3. Nominal Detection ==========
-    let nominal = "0";
-
-    // Strategy 1: Look for "Total Bayar" or similar labels (incl. OCR garble like 'ayar')
-    const nominalPatterns = [
-        /[Tt]otal\s*[Bb]ayar\s*[:;.]?\s*[Rr]?[Pp]?[\s.]*(\d[\d.,\s-]+)/,
-        /[Tt]otal\s*[Bb]ayar\s*[:;.]?\s*(\d[\d.,\s-]+)/,
-        /[Bb]ayar\s*[:;.]?\s*[Rr]?[Pp]?[\s.]*(\d[\d.,\s-]+)/,
-        /sayar\s*[:;.]?\s*[Rr]?[Pp]?[\s.]*(\d[\d.,\s-]+)/i,
-        /ayar\s*[:;.]?\s*[Rr]?[Pp]?[\s.]*(\d[\d.,\s-]+)/i,
-        /[Nn]etto\s*[:;.]?\s*[Rr]?[Pp]?[\s.]*(\d[\d.,\s-]+)/,
-        /[Tt]otal\s*[:;.]?\s*[Rr]?[Pp]?[\s.]*(\d[\d.,\s-]+)/,
-        /[Rr][Pp][\s.]*(\d[\d.,\s-]+)/
-    ];
-
-    let candidates = [];
-    for (const pat of nominalPatterns) {
-        const allMatches = cleanText.matchAll(new RegExp(pat, 'g'));
-        for (const m of allMatches) {
-            let rawNum = m[1].replace(/[\s-]+/g, '').split(',')[0].replace(/[^0-9]/g, '');
-            if (rawNum && rawNum.length >= 4) {
-                candidates.push(Number(rawNum));
+        // 3. Nominal
+        let nominal = "0";
+        let cands = [];
+        const pats = [
+            /[Tt]otal\s*[Bb]ayar\s*[:;.]?\s*[Rr]?[Pp]?[\s.]*(\d[\d.,\s-]+)/,
+            /(?:[Bb]ayar|sayar|ayar)\s*[:;.]?\s*[Rr]?[Pp]?[\s.]*(\d[\d.,\s-]+)/i,
+            /[Rr][Pp][\s.]*(\d[\d.,\s-]+)/i
+        ];
+        for (const p of pats) {
+            const mArr = cleanText.matchAll(new RegExp(p, 'g'));
+            for (const m of mArr) {
+                const v = m[1].replace(/[\s-]+/g, '').split(',')[0].replace(/[^0-9]/g, '');
+                if (v.length >= 4 && v.length <= 9) cands.push(Number(v));
             }
         }
-    }
-
-    // Strategy 2: Brute-force fallback — find ALL formatted numbers (like 250.030 or 1.371.320)
-    if (candidates.length === 0) {
-        const allNums = cleanText.matchAll(/(\d{1,3}(?:[.\s]\d{3})+)/g);
-        for (const m of allNums) {
-            let rawNum = m[1].replace(/[^0-9]/g, '');
-            // Limit to 9 digits (max 999 million) to strictly avoid NPWP/Phone numbers.
-            // Steel invoices rarely exceed 999M; if they do, 'Terbilang' or 'Total Bayar' will catch them.
-            if (rawNum && rawNum.length >= 5 && rawNum.length <= 9) {
-                candidates.push(Number(rawNum));
+        if (cands.length === 0) {
+            const bf = cleanText.matchAll(/(\d{1,3}(?:[.\s]\d{3})+)/g);
+            for (const b of bf) {
+                const v = b[1].replace(/[^0-9]/g, '');
+                if (v.length >= 5 && v.length <= 9) cands.push(Number(v));
             }
         }
-    }
-
-    // Strategy 3: SUM all subtotals from invoice line items
-    // Pattern: numbers at end of lines like "250.030,50,-" or "189.000.00,-"
-    if (candidates.length === 0) {
-        let subtotalSum = 0;
-        const lineItemPattern = /(\d{1,3}(?:[.,]\d{3})+)(?:[.,]\d{2})?[.,]?\s*-\s*$/gm;
-        const lineMatches = cleanText.matchAll(lineItemPattern);
-        for (const m of lineMatches) {
-            let rawNum = m[1].replace(/[^0-9]/g, '');
-            if (rawNum && rawNum.length >= 4) {
-                subtotalSum += Number(rawNum);
-            }
-        }
-        if (subtotalSum > 0) {
-            candidates.push(subtotalSum);
-        }
-    }
-
-    // Strategy 4: (Ultimate Fallback) Terbilang Parser
-    // Often amounts are explicitly spelled out as "empat juta sembilan ratus ribu rupiah"
-    if (candidates.length === 0 || Math.max(...candidates) < 1000) {
-        // Find index of the word 'terbilang' and grab the next 150 characters (ignores newlines and noise)
         const tIdx = cleanText.toLowerCase().indexOf('terbilang');
         if (tIdx !== -1) {
-            const rawTerbilangText = cleanText.substring(tIdx, tIdx + 150);
-            let parseTerbilang = (text) => {
-                const map = {
-                    'satu': 1, 'se': 1, 'dua': 2, 'tiga': 3, 'empat': 4, 'lima': 5,
-                    'enam': 6, 'tujuh': 7, 'delapan': 8, 'sembilan': 9, 'sepuluh': 10, 'sebelas': 11
-                };
-                let words = text.toLowerCase().match(/[a-z]+/g);
-                if (!words) return 0;
-                let total = 0; let current = 0;
-                for (let w of words) {
-                    if (map[w]) current += map[w];
-                    else if (w === 'belas') current = Math.max(1, current) + 10;
-                    else if (w === 'puluh') current = Math.max(1, current) * 10;
-                    else if (w === 'ratus') current = Math.max(1, current) * 100;
-                    else if (w === 'ribu') { total += Math.max(1, current) * 1000; current = 0; }
-                    else if (w === 'juta') { total += Math.max(1, current) * 1000000; current = 0; }
-                    else if (w === 'milyar') { total += Math.max(1, current) * 1000000000; current = 0; }
+            const wArr = cleanText.substring(tIdx, tIdx + 200).toLowerCase().match(/[a-z]+/g);
+            if (wArr) {
+                const m = { 'satu': 1, 'se': 1, 'dua': 2, 'tiga': 3, 'empat': 4, 'lima': 5, 'enam': 6, 'tujuh': 7, 'delapan': 8, 'sembilan': 9, 'sepuluh': 10, 'sebelas': 11 };
+                let tot = 0, cur = 0;
+                for (let w of wArr) {
+                    if (m[w]) cur += m[w];
+                    else if (w === 'belas') cur = Math.max(1, cur) + 10;
+                    else if (w === 'puluh') cur = Math.max(1, cur) * 10;
+                    else if (w === 'ratus') cur = Math.max(1, cur) * 100;
+                    else if (w === 'ribu') { tot += Math.max(1, cur) * 1000; cur = 0; }
+                    else if (w === 'juta') { tot += Math.max(1, cur) * 1000000; cur = 0; }
                 }
-                total += current;
-                // If it ends with "ratus" but total < 100000, probably meant "ratus ribu" in OCR cuts
-                if (words[words.length - 1] === 'ratus' && total > 1000 && (total % 1000 !== 0) && total < 100000) {
-                    // "empat juta sembilan ratus" -> 4000900 -> probably 4900000
-                    const jutaPart = Math.floor(total / 1000000) * 1000000;
-                    const rem = total - jutaPart;
-                    if (rem > 0 && rem < 1000) total = jutaPart + (rem * 1000);
-                }
-                return total;
-            };
-            const tbVal = parseTerbilang(rawTerbilangText);
-            if (tbVal > 0) candidates.push(tbVal);
-        }
-    }
-
-    if (candidates.length > 0) {
-        const highest = Math.max(...candidates);
-        nominal = highest.toLocaleString('id-ID');
-    }
-
-    // ========== 4. Date Detection ==========
-    let dateStr = "00-Unknown";
-
-    // We want the VERY FIRST date in the document that has a 4-digit year.
-    // This perfectly bypasses "batas maksimal retur" or "jatuh tempo" which are at the bottom.
-    // Matches: "24-Mei-2026", "24 05 2026", "24/Mei/2026", "24.05.2026"
-    const generalDatePat = /\b(\d{1,2})\s*[-/\s.,]+\s*([A-Za-z]{3,9}|\d{1,2})\s*[-/\s.,]+\s*(\d{4})\b/ig;
-    const allDates = [...cleanText.matchAll(generalDatePat)];
-
-    // Priority: find one prefixed directly by Tgl or Cetak if possible
-    let chosenDateMatch = null;
-    const explicitMatch = cleanText.match(/(?:[Cc]etak|[Tt]gl|[Tt]anggal)\s*[:;.]?\s*(\d{1,2})\s*[-/\s.,]+\s*([A-Za-z]{3,9}|\d{1,2})\s*[-/\s.,]+\s*(\d{4})/i);
-
-    const indMonthMap = {
-        'JAN': 'Januari', 'FEB': 'Februari', 'MAR': 'Maret', 'APR': 'April',
-        'MEI': 'Mei', 'MAY': 'Mei', 'MEL': 'Mei', 'MEY': 'Mei', 'JUN': 'Juni', 'JUL': 'Juli',
-        'AGU': 'Agustus', 'AUG': 'Agustus', 'SEP': 'September', 'OKT': 'Oktober',
-        'OCT': 'Oktober', 'NOV': 'November', 'DES': 'Desember', 'DEC': 'Desember',
-        '01': 'Januari', '1': 'Januari', '02': 'Februari', '2': 'Februari',
-        '03': 'Maret', '3': 'Maret', '04': 'April', '4': 'April',
-        '05': 'Mei', '5': 'Mei', '06': 'Juni', '6': 'Juni',
-        '07': 'Juli', '7': 'Juli', '08': 'Agustus', '8': 'Agustus',
-        '09': 'September', '9': 'September', '10': 'Oktober',
-        '11': 'November', '12': 'Desember'
-    };
-
-    if (explicitMatch) {
-        const d = parseInt(explicitMatch[1], 10);
-        const mSub = explicitMatch[2].substring(0, 3).toUpperCase();
-        // Only accept if day is 1-31 and month is valid (not 0 or NaN from OCR quirks)
-        if (d > 0 && d <= 31 && indMonthMap[mSub]) {
-            chosenDateMatch = explicitMatch;
-        }
-    }
-
-    if (!chosenDateMatch) {
-        // Fallback to searching all dates, but skip mangled "0" or "32+" days or months not in map
-        for (const m of allDates) {
-            const d = parseInt(m[1], 10);
-            const mSub = m[2].substring(0, 3).toUpperCase();
-            if (d > 0 && d <= 31 && indMonthMap[mSub]) {
-                chosenDateMatch = m;
-                break;
+                tot += cur; if (tot > 1000) cands.push(tot);
             }
         }
-    }
+        if (cands.length > 0) nominal = Math.max(...cands).toLocaleString('id-ID');
 
-    if (chosenDateMatch) {
-        const day = parseInt(chosenDateMatch[1], 10).toString(); // removes leading zero if present
-        const rawMonth = chosenDateMatch[2].substring(0, 3).toUpperCase();
-        const month = indMonthMap[rawMonth];
-        if (month) {
-            dateStr = `${day} ${month}`;
+        // 4. Date
+        let date = "00-Unknown";
+        const monMap = {
+            'JAN': 'Januari', 'FEB': 'Februari', 'MAR': 'Maret', 'APR': 'April',
+            'MEI': 'Mei', 'MAY': 'Mei', 'MEL': 'Mei', 'MEY': 'Mei', 'JUN': 'Juni', 'JUL': 'Juli',
+            'AGU': 'Agustus', 'AUG': 'Agustus', 'SEP': 'September', 'OKT': 'Oktober', 'OCT': 'Oktober',
+            'NOV': 'November', 'DES': 'Desember', 'DEC': 'Desember',
+            '01': 'Januari', '1': 'Januari', '02': 'Februari', '2': 'Februari', '03': 'Maret', '3': 'Maret',
+            '04': 'April', '4': 'April', '05': 'Mei', '5': 'Mei', '06': 'Juni', '6': 'Juni',
+            '07': 'Juli', '7': 'Juli', '08': 'Agustus', '8': 'Agustus', '09': 'September', '9': 'September',
+            '10': 'Oktober', '11': 'November', '12': 'Desember'
+        };
+        const dPat = /\b(\d{1,2})\s*[-/\s.,]+\s*([A-Za-z]{3,9}|\d{1,2})\s*[-/\s.,]+\s*(\d{4})\b/ig;
+        const allD = [...cleanText.matchAll(dPat)];
+        const exp = cleanText.match(/(?:[Cc]etak|[Tt]gl|[Tt]anggal)\s*[:;.]?\s*(\d{1,2})\s*[-/\s.,]+\s*([A-Za-z]{3,9}|\d{1,2})\s*[-/\s.,]+\s*(\d{4})/i);
+        let chs = null;
+        if (exp && parseInt(exp[1], 10) > 0 && parseInt(exp[1], 10) <= 31 && monMap[exp[2].substring(0, 3).toUpperCase()]) chs = exp;
+        if (!chs) {
+            for (const m of allD) if (parseInt(m[1], 10) > 0 && parseInt(m[1], 10) <= 31 && monMap[m[2].substring(0, 3).toUpperCase()]) { chs = m; break; }
         }
+        if (chs) {
+            const mon = monMap[chs[2].substring(0, 3).toUpperCase()];
+            if (mon) date = `${parseInt(chs[1], 10)} ${mon}`;
+        }
+
+        const sug = `${type} ${store} ${nominal} ${date}.pdf`.toUpperCase().replace(/\s+/g, ' ');
+        return { toko: store, nominal, date, type, suggestion: sug, needsReview: review, fallbackCause: cause, rawText: cleanText.substring(0, 1500) };
+    } catch (e) {
+        console.error(e);
+        return { toko: "ERR", nominal, date: "00-Unknown", type: "???", suggestion: `ERR_${originalName}`, needsReview: true, fallbackCause: e.message, rawText: text.substring(0, 1000) };
     }
-
-    const suggestion = `${type} ${detectedToko} ${nominal} ${dateStr}.pdf`.replace(/\s+/g, ' ');
-
-    return {
-        toko: detectedToko,
-        nominal: nominal,
-        date: dateStr,
-        type: type,
-        suggestion: suggestion.toUpperCase(),
-        needsReview: needsReview,
-        fallbackCause: fallbackCause,
-        rawText: cleanText.substring(0, 1500) // Debug: first 1500 chars of OCR text
-    };
 }
 
 // ---- UI Rendering ----
 function renderResults() {
     const body = document.getElementById('result-body');
+    if (!body) return;
     body.innerHTML = filesToProcess.map((item, i) => {
         const res = item.result;
-        const reviewClass = res?.needsReview ? 'text-amber-400' : 'text-white';
         const tokoClass = (res?.toko === 'UNKNOWN' || res?.needsReview) ? 'text-amber-400' : 'text-white';
         return `
-            <tr class="hover:bg-white/5 transition-all">
+            <tr class="hover:bg-white/5 transition-all border-b border-white/5">
                 <td class="py-4 pr-4">
-                    <p class="text-xs text-gray-300 font-medium truncate w-48">${item.file.name}</p>
+                    <p class="text-[11px] text-gray-300 font-medium truncate w-48">${item.file.name}</p>
                     ${res?.rawText ? `<button onclick="showDebugText(${i})" class="text-[9px] text-indigo-500 hover:text-indigo-400 mt-1 transition-all">🔍 Lihat Teks OCR</button>` : ''}
                 </td>
                 <td class="py-4 px-4 font-['Outfit'] font-bold ${tokoClass}">
                     ${res?.toko || '--'}
-                    ${res?.needsReview ? `<p class="text-[9px] text-amber-500/70 font-normal mt-1">⚠ ${res.fallbackCause}</p>` : ''}
+                    ${res?.needsReview ? `<p class="text-[9px] text-amber-500/70 font-normal mt-1 italic">⚠ ${res.fallbackCause}</p>` : ''}
                 </td>
                 <td class="py-4 px-4">
                     <p class="text-[10px] text-gray-300">💰 ${res?.nominal || '--'}</p>
@@ -684,10 +466,10 @@ function renderResults() {
                 </td>
                 <td class="py-4 px-4">
                     <span class="px-2 py-1 rounded bg-indigo-500/10 text-indigo-400 text-[10px] font-mono font-bold">
-                        ${res?.suggestion || 'Analyzing...'}
+                        ${res?.suggestion || 'Menganalisa...'}
                     </span>
                 </td>
-                <td class="py-4 pl-4">
+                <td class="py-4 pl-4 text-right">
                     ${renderStatus(item, i)}
                 </td>
             </tr>
@@ -695,42 +477,15 @@ function renderResults() {
     }).join('');
 }
 
-function showDebugText(index) {
-    const item = filesToProcess[index];
-    if (!item?.result?.rawText) return;
-    const modal = document.createElement('div');
-    modal.className = 'fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md';
-    modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
-    modal.innerHTML = `
-        <div class="premium-card rounded-3xl p-8 w-full max-w-3xl max-h-[80vh] flex flex-col">
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-bold text-white">🔍 Teks OCR: ${item.file.name}</h3>
-                <button onclick="this.closest('.fixed').remove()" class="text-gray-400 hover:text-white transition-all text-xl">&times;</button>
-            </div>
-            <pre class="flex-1 overflow-auto text-xs text-gray-300 bg-[#0a0f1a] rounded-2xl p-4 font-mono whitespace-pre-wrap custom-scrollbar">${item.result.rawText}</pre>
-            <p class="text-[10px] text-gray-600 mt-3 text-center">Gunakan teks ini sebagai referensi untuk mengisi kata kunci di Pemetaan.</p>
-        </div>
-    `;
-    document.body.appendChild(modal);
-}
-
 function renderStatus(item, i) {
-    if (item.status === 'pending') return '<span class="text-[10px] text-gray-600">Pending</span>';
-    if (item.status === 'processing') return `
-        <div class="flex items-center gap-1 loader-dots">
-            <div class="w-1 h-1 rounded-full bg-indigo-400"></div>
-            <div class="w-1 h-1 rounded-full bg-indigo-400"></div>
-            <div class="w-1 h-1 rounded-full bg-indigo-400"></div>
-        </div>
-    `;
+    if (item.status === 'pending') return '<span class="text-[10px] text-gray-600">Menunggu</span>';
+    if (item.status === 'processing') return '<div class="loader-dots"><span></span><span></span><span></span></div>';
     if (item.status === 'done') return `
         <button onclick="downloadFile(${i})" class="p-2 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-all">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-            </svg>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
         </button>
     `;
-    return '<span class="text-[10px] text-red-400 font-bold">Error</span>';
+    return '<span class="text-[10px] text-red-400">Error</span>';
 }
 
 async function downloadFile(index) {
@@ -747,88 +502,67 @@ async function downloadFile(index) {
 }
 
 function checkDownloadAll() {
-    const doneCount = filesToProcess.filter(f => f.status === 'done').length;
-    if (doneCount > 1) {
-        document.getElementById('download-all-btn').classList.remove('hidden');
-    }
+    const done = filesToProcess.filter(f => f.status === 'done');
+    const btn = document.getElementById('download-all-btn');
+    if (btn && done.length > 1) btn.classList.remove('hidden');
 }
 
-// ---- Mapping Editor ----
+function showDebugText(index) {
+    const item = filesToProcess[index];
+    if (!item?.result?.rawText) return;
+    const modal = document.createElement('div');
+    modal.className = 'fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md';
+    modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+    modal.innerHTML = `
+        <div class="premium-card rounded-3xl p-8 w-full max-w-3xl max-h-[80vh] flex flex-col bg-[#0d121f] border border-white/10 shadow-2xl">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-bold text-white">🔍 Hasil OCR: ${item.file.name}</h3>
+                <button onclick="this.closest('.fixed').remove()" class="text-gray-400 hover:text-white transition-all text-2xl">&times;</button>
+            </div>
+            <pre class="flex-1 overflow-auto text-[10px] text-indigo-200/70 bg-black/40 rounded-2xl p-6 font-mono whitespace-pre-wrap custom-scrollbar border border-white/5">${item.result.rawText}</pre>
+            <p class="text-[10px] text-gray-500 mt-4 text-center">Gunakan teks mentah di atas untuk menyesuaikan kata kunci pemetaan jika deteksi otomatis gagal.</p>
+        </div>
+    `;
+    document.body.appendChild(modal);
+}
+
+// Mapping Modal Helpers
 function editMapping() {
     const modal = document.getElementById('mapping-modal');
     const body = document.getElementById('mapping-editor-body');
-    body.innerHTML = ''; // Clear
-
-    if (PT_MAPPING.length === 0) {
-        addMappingRow();
-    } else {
-        PT_MAPPING.forEach(rule => addMappingRow(rule.pt, rule.secondary, rule.store));
-    }
-
+    body.innerHTML = '';
+    if (PT_MAPPING.length === 0) addMappingRow();
+    else PT_MAPPING.forEach(r => addMappingRow(r.pt, r.secondary, r.store));
     modal.classList.remove('hidden');
 }
 
-function addMappingRow(pt = "", secondary = "", store = "") {
+function addMappingRow(pt = "", sec = "", st = "") {
     const body = document.getElementById('mapping-editor-body');
-    const row = document.createElement('tr');
-    row.className = 'group hover:bg-white/5 transition-all transition-all';
-    row.innerHTML = `
-        <td class="py-2 px-2">
-            <input type="text" placeholder="Contoh: PT. DUNIA BAJA" value="${pt}" class="w-full bg-transparent border-none outline-none text-xs text-white placeholder:text-gray-600 focus:ring-0">
-        </td>
-        <td class="py-2 px-2">
-            <input type="text" placeholder="Contoh: BEKASI" value="${secondary}" class="w-full bg-transparent border-none outline-none text-xs text-indigo-300 placeholder:text-gray-600 focus:ring-0">
-        </td>
-        <td class="py-2 px-2">
-            <input type="text" placeholder="Contoh: MB_BEKASI" value="${store}" class="w-full bg-transparent border-none outline-none text-xs text-emerald-400 placeholder:text-gray-600 focus:ring-0 font-bold">
-        </td>
-        <td class="py-2 px-2 text-right">
-            <button onclick="this.closest('tr').remove()" class="p-1.5 rounded-lg text-gray-600 hover:text-red-400 hover:bg-red-400/10 transition-all opacity-0 group-hover:opacity-100">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-            </button>
-        </td>
+    const tr = document.createElement('tr');
+    tr.className = 'group border-b border-white/5';
+    tr.innerHTML = `
+        <td class="py-2 px-2"><input type="text" value="${pt}" class="w-full bg-transparent border-none outline-none text-xs text-white focus:ring-0"></td>
+        <td class="py-2 px-2"><input type="text" value="${sec}" class="w-full bg-transparent border-none outline-none text-xs text-indigo-300 focus:ring-0"></td>
+        <td class="py-2 px-2"><input type="text" value="${st}" class="w-full bg-transparent border-none outline-none text-xs text-emerald-400 font-bold focus:ring-0"></td>
+        <td class="py-2 px-2 text-right"><button onclick="this.closest('tr').remove()" class="text-red-400/50 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all">&times;</button></td>
     `;
-    body.appendChild(row);
-}
-
-function closeMapping() {
-    document.getElementById('mapping-modal').classList.add('hidden');
+    body.appendChild(tr);
 }
 
 function saveMapping() {
     const rows = document.querySelectorAll('#mapping-editor-body tr');
     const newRules = [];
-
     rows.forEach(row => {
-        const inputs = row.querySelectorAll('input');
-        const pt = inputs[0].value.trim();
-        const secondary = inputs[1].value.trim();
-        const store = inputs[2].value.trim();
-
-        if (pt && store) {
-            newRules.push({ pt, secondary, store });
+        const ins = row.querySelectorAll('input');
+        if (ins[0].value.trim() && ins[2].value.trim()) {
+            newRules.push({ pt: ins[0].value.trim(), secondary: ins[1].value.trim(), store: ins[2].value.trim() });
         }
     });
-
     PT_MAPPING = newRules;
-    localStorage.setItem('pt_mapping_v2', JSON.stringify(PT_MAPPING));
+    localStorage.setItem('pt_mapping_v4', JSON.stringify(PT_MAPPING));
     renderMappingUI();
-    closeMapping();
-
-    // Auto re-analyze ALL files already in the queue
-    if (filesToProcess.length > 0) {
-        filesToProcess.forEach(f => {
-            f.status = 'pending';
-            f.result = null;
-        });
-        const dlBtn = document.getElementById('download-all-btn');
-        if (dlBtn) dlBtn.classList.add('hidden');
-        if (!isProcessing) processQueue();
-    }
-
-    if (typeof Toast !== 'undefined') {
-        Toast.success('Pemetaan disimpan & file dianalisa ulang!');
-    } else {
-        alert('Pemetaan disimpan & file dianalisa ulang!');
-    }
+    document.getElementById('mapping-modal').classList.add('hidden');
+    // Re-process
+    filesToProcess.forEach(f => { f.status = 'pending'; f.result = null; });
+    processQueue();
 }
