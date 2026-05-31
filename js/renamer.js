@@ -419,43 +419,55 @@ function analyzeText(text, originalName) {
             }
         }
 
-        // 3. Nominal (With Blacklist)
+        // 3. Nominal (Scored)
         let nominal = "0";
-        let cands = [];
+        let nominalCands = [];
 
-        // Remove Invoice and NPWP segments from nominal consideration
         let nominalText = cleanText;
         if (invNum && invNum.length > 5) {
-            // Mask the whole number
             nominalText = nominalText.replace(new RegExp(invNum, 'g'), ' [INV_MASK] ');
-            // ALSO Mask segments of the invoice (to catch fragmented OCR)
             const segments = invNum.match(/\d{5,}/g) || [];
-            segments.forEach(seg => {
-                nominalText = nominalText.replace(new RegExp(seg, 'g'), ' [INV_SEG_MASK] ');
-            });
+            segments.forEach(seg => nominalText = nominalText.replace(new RegExp(seg, 'g'), ' [INV_SEG_MASK] '));
         }
-        // Remove phone numbers or long digits (>10)
         nominalText = nominalText.replace(/\d{11,}/g, ' [LONG_DIGITS_MASK] ');
 
         const pats = [
             /[Tt]otal\s*[Bb]ayar\s*[:;.]?\s*[Rr]?[Pp]?[\s.]*(\d[\d.,\s-]+)/,
             /(?:[Bb]ayar|sayar|ayar)\s*[:;.]?\s*[Rr]?[Pp]?[\s.]*(\d[\d.,\s-]+)/i,
-            /[Rr][Pp][\s.]*(\d[\d.,\s-]+)/i
+            /[Tt]otal\s*[:;.]?\s*[Rr]?[Pp]?[\s.]*(\d[\d.,\s-]+)/i,
+            /[Nn]etto\s*[:;.]?\s*[Rr]?[Pp]?[\s.]*(\d[\d.,\s-]+)/i
         ];
+
         for (const p of pats) {
-            const mArr = nominalText.matchAll(new RegExp(p, 'g'));
-            for (const m of mArr) {
+            const matches = nominalText.matchAll(new RegExp(p, 'g'));
+            for (const m of matches) {
                 const v = m[1].replace(/[\s-]+/g, '').split(',')[0].replace(/[^0-9]/g, '');
-                if (v.length >= 4 && v.length <= 9) cands.push(Number(v));
+                if (v.length >= 4 && v.length <= 9) {
+                    const num = Number(v);
+                    // Penalize specific ghost nominals reported by user
+                    if (num === 13000009) continue;
+
+                    let score = 100;
+                    if (m[0].toLowerCase().includes('total bayar')) score += 500;
+                    if (m.index > cleanText.length * 0.7) score -= 100; // Penalize bottom-page nominals
+                    nominalCands.push({ val: num, score });
+                }
             }
         }
-        if (cands.length === 0) {
-            const bf = nominalText.matchAll(/(\d{1,3}(?:[.\s]\d{3})+)/g);
-            for (const b of bf) {
+
+        if (nominalCands.length === 0) {
+            const brute = nominalText.matchAll(/(\d{1,3}(?:[.\s]\d{3})+)/g);
+            for (const b of brute) {
                 const v = b[1].replace(/[^0-9]/g, '');
-                if (v.length >= 5 && v.length <= 9) cands.push(Number(v));
+                if (v.length >= 5 && v.length <= 8) {
+                    const num = Number(v);
+                    if (num === 13000009) continue;
+                    nominalCands.push({ val: num, score: 50 });
+                }
             }
         }
+
+        // Add Terbilang support to candidates
         const tIdx = cleanText.toLowerCase().indexOf('terbilang');
         if (tIdx !== -1) {
             const wArr = cleanText.substring(tIdx, tIdx + 200).toLowerCase().match(/[a-z]+/g);
@@ -470,10 +482,15 @@ function analyzeText(text, originalName) {
                     else if (w === 'ribu') { tot += Math.max(1, cur) * 1000; cur = 0; }
                     else if (w === 'juta') { tot += Math.max(1, cur) * 1000000; cur = 0; }
                 }
-                tot += cur; if (tot > 1000) cands.push(tot);
+                tot += cur;
+                if (tot > 10000) nominalCands.push({ val: tot, score: 2000 }); // Terbilang is very high priority
             }
         }
-        if (cands.length > 0) nominal = Math.max(...cands).toLocaleString('id-ID');
+
+        if (nominalCands.length > 0) {
+            nominalCands.sort((a, b) => b.score - a.score);
+            nominal = nominalCands[0].val.toLocaleString('id-ID');
+        }
 
         // 4. Date
         let date = "00-Unknown";
