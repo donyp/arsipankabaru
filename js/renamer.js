@@ -268,31 +268,32 @@ async function extractTextFromPDF(file) {
     }
 
     const lowerText = fullText.toLowerCase();
-    // Rescue OCR: if PDF text layer is present but suspiciously missing financial keywords
-    let needsRescue = false;
-    if (fullText.trim().length > 100) {
-        const hasBayar = lowerText.includes('bayar') || lowerText.includes('total') || lowerText.includes('jumlah');
-        const hasYth = lowerText.includes('yth') || lowerText.includes('kepada');
-        if (!hasBayar || !hasYth) needsRescue = true;
-    }
 
-    if (fullText.trim().length < 50 || needsRescue) {
-        console.log(`[AI] Using OCR (Rescue Mode)...`);
+    // Pass 1: Extract as much as possible from PDF text layer
+    let rawText = cleanTextForAI(fullText);
+
+    // If PDF text is suspicious (too short or missing keywords), run a SAFE OCR pass
+    if (fullText.trim().length < 50 || (!lowerText.includes('yth') && !lowerText.includes('bayar'))) {
+        console.log(`[AI] Metadata missing in PDF layer, using Safe OCR (Scale 2.5)...`);
         const page = await pdf.getPage(1);
-        const viewport = page.getViewport({ scale: 3.5 });
+        const viewport = page.getViewport({ scale: 2.5 });
         const canvas = document.createElement('canvas');
         const context = canvas.getContext('2d');
         canvas.height = viewport.height;
         canvas.width = viewport.width;
+        await page.render({ canvasContext: context, viewport }).promise;
 
-        await page.render({ canvasContext: context, viewport: viewport }).promise;
-
-        const { data: { text } } = await Tesseract.recognize(canvas, 'ind+eng', {
-            logger: m => console.log(m.status + ": " + Math.round(m.progress * 100) + "%")
+        const { data: { text: ocrText } } = await Tesseract.recognize(canvas, 'ind+eng', {
+            logger: m => console.log(`[OCR] ${Math.round(m.progress * 100)}%`)
         });
-        fullText = text;
+        rawText += "\n" + cleanTextForAI(ocrText);
     }
-    return fullText;
+
+    return rawText;
+}
+
+function cleanTextForAI(text) {
+    return text.replace(/\s+/g, ' ').replace(/[|]/g, '').trim();
 }
 
 function analyzeText(text, originalName) {
@@ -450,23 +451,30 @@ function analyzeText(text, originalName) {
         const bayarPos = findLabelPos(/[Bb]\s*[Aa]\s*[Yy]\s*[Aa]\s*[Rr]/i);
         const nettoPos = findLabelPos(/[Nn]\s*[Ee]\s*[Tt]\s*[Tt]\s*[Oo]/i);
 
-        // Strategy: In A4 invoices, look for the LARGEST number that has a currency suffix (,00 or .-)
-        // or the physically LAST large number.
+        // Strategy: Filter out NPWP (15-digit) or segments of it before picking the total.
+        // Also remove the invoice number.
+        const npwpPattern = /\b\d{2}[.\s]?\d{3}[.\s]?\d{3}[.\s]?\d[.\s]?\d{3}[.\s]?\d{3}\b/g;
+        (cleanText.match(npwpPattern) || []).forEach(n => {
+            const cleanN = n.replace(/[^0-9]/g, '');
+            nominalText = nominalText.replace(new RegExp(n.replace(/[.]/g, '\\.'), 'g'), ' [NPWP] ');
+            if (cleanN.length > 5) {
+                const segs = cleanN.match(/\d{5,}/g) || [];
+                segs.forEach(s => nominalText = nominalText.replace(new RegExp(s, 'g'), ' [NPWP_SEG] '));
+            }
+        });
+
         const brute = [...nominalText.matchAll(/(\d{1,3}(?:[.\s]\d{3})+(?:,\d{2}|[,-]+)?)/g)];
         for (const b of brute) {
             const v = b[1].replace(/[^-0-9]/g, '').split('-')[0].split(',')[0];
             if (v.length >= 4 && v.length <= 9) {
                 const num = Number(v);
                 let score = 0;
-                // Physical position
                 const posRatio = b.index / cleanText.length;
-                if (posRatio > 0.7) score += 1000;
-                else if (posRatio > 0.5) score += 500;
+                if (posRatio > 0.8) score += 2000; // Bottom 20% is where the total lives
+                else if (posRatio > 0.6) score += 500;
 
-                // Labels & Suffixes
-                if (b[1].includes(',00') || b[1].includes(',-')) score += 500;
-                if (totalPos !== -1 && Math.abs(b.index - totalPos) < 200) score += 400;
-                if (bayarPos !== -1 && Math.abs(b.index - bayarPos) < 200) score += 400;
+                if (b[1].includes(',00') || b[1].includes(',-')) score += 300;
+                if (totalPos !== -1 && b.index > totalPos) score += 500;
 
                 nominalCands.push({ val: num, score, index: b.index });
             }
@@ -476,7 +484,6 @@ function analyzeText(text, originalName) {
             nominalCands.sort((a, b) => b.score - a.score || b.index - a.index);
             const topScore = nominalCands[0].score;
             const topCands = nominalCands.filter(c => c.score >= topScore - 100);
-            // From the top-scoring group, pick the LARGEST value
             nominal = Math.max(...topCands.map(c => c.val)).toLocaleString('id-ID');
         }
 
