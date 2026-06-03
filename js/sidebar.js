@@ -1,16 +1,16 @@
 // ============================================================
 // Shared Sidebar Component — Single Source of Truth
 // Auto-detects current page and renders the sidebar
-// Version 2.1.1 - Definitive Clean Build (No AI PDF Renamer)
+// Version 2.1.2 - Final UI Audit Build (Icons & Guard)
 // ============================================================
-console.log("Sidebar Version 2.1.1 - Clean Build Executed");
+console.log("Sidebar Version 2.1.2 - Clean Build Executed");
 
 (function () {
     const activePage = window.location.pathname.split('/').pop() || 'dashboard.html';
 
     const menuItems = [
         { section: 'Menu Utama' },
-        { href: 'dashboard.html', label: 'Dashboard', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6', guard: 'data-role="super_admin"' },
+        { href: 'dashboard.html', label: 'Dashboard (v2.1.2-Clean)', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6', guard: 'data-role="super_admin"' },
 
         {
             isDropdown: true,
@@ -68,7 +68,8 @@ console.log("Sidebar Version 2.1.1 - Clean Build Executed");
         if (iconPathsArr) {
             return iconPathsArr.map(p => `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="${p}" />`).join('');
         }
-        return `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="${iconStr}" />`;
+        // Standardized to stroke-width="2" for clarity
+        return `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="${iconStr}" />`;
     }
 
     let navHTML = '';
@@ -208,6 +209,15 @@ console.log("Sidebar Version 2.1.1 - Clean Build Executed");
         if (typeof updateUserUI === 'function') {
             updateUserUI();
         }
+
+        // --- DESPERATION GUARD: Forced Cleanup of Rogue Links ---
+        setTimeout(() => {
+            document.querySelectorAll('a[href*="renamer"]').forEach(el => {
+                console.log("[Desperation Guard] Removing rogue link:", el.href);
+                el.remove();
+            });
+            // Also check for text-nodes containing Renamer if necessary
+        }, 1000);
     }
 
     async function loadGlobalBroadcast() {
