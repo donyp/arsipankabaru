@@ -125,6 +125,15 @@
                 isMaintenanceActive = !!status.isMaintenance;
 
                 if (isMaintenanceActive) {
+                    // Format Date: 12.30 WIB, 14 Juni 2026
+                    let sinceText = '';
+                    if (status.updatedAt) {
+                        const d = new Date(status.updatedAt);
+                        const time = d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false }).replace(':', '.');
+                        const date = d.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+                        sinceText = `sejak : ${time} WIB, ${date}`;
+                    }
+
                     const noticeEl = document.createElement('div');
                     noticeEl.className = 'mb-8 p-4 bg-red-50 border border-red-100 rounded-3xl animate-fade-in-up';
                     noticeEl.innerHTML = `
@@ -137,6 +146,7 @@
                             <div class="flex-1">
                                 <p class="text-[10px] font-black text-red-600 uppercase tracking-widest leading-none mb-1">System Maintenance</p>
                                 <p class="text-[11px] font-bold text-red-500/70 leading-normal">Hanya Admin/Moderator yang diizinkan masuk.</p>
+                                ${sinceText ? `<p class="text-[9px] font-medium text-red-400 mt-1">sejak : ${sinceText.replace('sejak : ', '')}</p>` : ''}
                             </div>
                         </div>
                     `;
