@@ -92,15 +92,17 @@
             try {
                 // Correct function name from auth.js
                 await loginWithCredentials(username, password);
-                // Auth.js handles redirect to dashboard.html
             } catch (err) {
                 console.error(err);
                 btn.disabled = false;
                 btn.innerText = 'Masuk Sekarang';
-                if (err.message && err.message.includes('401')) {
+
+                if (err.status === 401) {
                     alert('Username atau password salah.');
+                } else if (err.status === 503) {
+                    alert('Sistem sedang dalam perbaikan (Maintenance Mode).');
                 } else {
-                    alert('Terjadi kesalahan sistem. Silakan coba lagi.');
+                    alert(err.message || 'Terjadi kesalahan sistem. Silakan coba lagi.');
                 }
             }
         });

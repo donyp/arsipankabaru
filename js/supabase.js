@@ -81,9 +81,13 @@ const API = {
             if (body.error?.includes('expired') || body.error?.includes('Token')) {
                 this.clearAuth();
                 window.location.href = 'index.html';
-                throw new Error('Sesi Anda telah berakhir. Silakan login kembali.');
+                const error = new Error('Sesi Anda telah berakhir. Silakan login kembali.');
+                error.status = res.status;
+                throw error;
             }
-            throw new Error(body.error || 'Akses ditolak.');
+            const error = new Error(body.error || 'Akses ditolak.');
+            error.status = res.status;
+            throw error;
         }
 
         // Handle Maintenance Mode (503)
@@ -101,7 +105,9 @@ const API = {
 
         if (!res.ok) {
             const body = await res.json().catch(() => ({}));
-            throw new Error(body.error || `HTTP Error ${res.status}`);
+            const error = new Error(body.error || `HTTP Error ${res.status}`);
+            error.status = res.status;
+            throw error;
         }
 
         // For file downloads, return the raw response
