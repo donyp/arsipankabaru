@@ -738,9 +738,8 @@ async function loadBugHistory() {
     if (!list) return;
 
     list.innerHTML = `
-        <div class="p-8 text-center">
-            <div class="loader-ring mx-auto mb-4 border-amber-500"></div>
-            <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Memuat riwayat...</p>
+        <div class="p-12 text-center">
+            <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest animate-pulse">Memuat riwayat...</p>
         </div>
     `;
 
