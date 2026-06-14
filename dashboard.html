@@ -498,7 +498,65 @@
         </div>
     </div>
 
-    <!-- Common Previews skipped -->
+    <!-- Dispute (Revisi) Modal -->
+    <div id="dispute-modal" class="fixed inset-0 z-[120] hidden">
+        <div class="absolute inset-0 bg-black/40 backdrop-blur-md" onclick="closeDisputeModal()"></div>
+        <div
+            class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-white rounded-[2.5rem] shadow-2xl overflow-hidden animate-fade-in-up">
+            <div class="p-8 border-b border-gray-100 flex items-center justify-between">
+                <div>
+                    <h3 class="text-xl font-black text-gray-900 uppercase">Ajukan Revisi</h3>
+                    <p class="text-[10px] font-bold text-amber-500 uppercase tracking-widest mt-1">Permintaan Perbaikan
+                        Data</p>
+                </div>
+                <button onclick="closeDisputeModal()"
+                    class="p-2 text-gray-400 hover:text-red-500 bg-gray-50 rounded-xl transition-all">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+
+            <div class="p-8 space-y-6">
+                <div class="p-4 bg-amber-50 rounded-2xl border border-amber-100">
+                    <p class="text-[8px] font-black text-amber-600 uppercase tracking-widest mb-1">Berkas</p>
+                    <p id="dispute-file-name" class="text-xs font-bold text-gray-900 truncate">Memuat...</p>
+                </div>
+
+                <div>
+                    <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Alasan
+                        Utama</label>
+                    <select id="dispute-reason"
+                        class="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-xs font-bold outline-none focus:ring-2 focus:ring-amber-200 transition-all">
+                        <option value="">Pilih Alasan...</option>
+                        <option value="Nominal Salah">Nominal Salah / Kurang</option>
+                        <option value="Tipe PPN Salah">Tipe PPN Salah</option>
+                        <option value="Tgl Dokumen Salah">Tanggal Dokumen Salah</option>
+                        <option value="Berkas Rusak">Berkas Tidak Terbaca</option>
+                        <option value="Duplikasi">Data Duplikat</option>
+                        <option value="Lainnya">Lainnya</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label
+                        class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Catatan
+                        Tambahan (Opsional)</label>
+                    <textarea id="dispute-note"
+                        class="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-xs font-medium outline-none focus:ring-2 focus:ring-amber-200 h-24"
+                        placeholder="Jelaskan detail perbaikan yang dibutuhkan..."></textarea>
+                </div>
+
+                <div class="pt-2">
+                    <button onclick="submitDispute()"
+                        class="w-full py-4 bg-amber-600 text-white font-black rounded-2xl hover:bg-amber-700 transition-all shadow-xl shadow-amber-200 active:scale-95 uppercase tracking-[0.2em] text-[10px]">
+                        Kirim Permintaan
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
     <div id="preview-modal" class="fixed inset-0 z-[110] hidden">
         <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="closePreview()"></div>
         <div class="absolute inset-4 md:inset-10 flex flex-col bg-white rounded-3xl overflow-hidden shadow-2xl">
