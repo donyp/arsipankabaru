@@ -935,3 +935,65 @@ select option {
     border-radius: 9999px;
     border: 1px solid;
 }
+
+/* ---- Notification & Header Enhancements ---- */
+.notification-dot {
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    width: 10px;
+    height: 10px;
+    background-color: #ef4444;
+    border-radius: 999px;
+    border: 2px solid #ffffff;
+    display: none;
+    z-index: 10;
+}
+
+.notification-dot.active {
+    display: block;
+    animation: ping-small 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+@keyframes ping-small {
+
+    75%,
+    100% {
+        transform: scale(1.8);
+        opacity: 0;
+    }
+}
+
+.dropdown-container {
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(10px);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.dropdown-container.active {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+/* Modal Enhancements */
+.profile-modal-content {
+    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+}
+
+.animate-pulse-slow {
+    animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: .7;
+    }
+}

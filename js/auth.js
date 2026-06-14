@@ -112,12 +112,16 @@ function updateUserUI() {
         el.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser.name)}&background=6366f1&color=fff&size=80`;
     });
 
-    // Update role badge
-    document.querySelectorAll('[data-user-role]').forEach(el => {
-        el.textContent = currentUser.role === 'super_admin' ? 'Super Admin' : 'Admin Zona';
-        el.className = currentUser.role === 'super_admin'
-            ? 'text-xs px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
-            : 'text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30';
+    // Update role badge and label
+    document.querySelectorAll('[data-user-role], [data-user-role-label]').forEach(el => {
+        const roleName = currentUser.role === 'super_admin' ? 'Super Admin' : 'Admin Zona';
+        el.textContent = roleName;
+
+        if (el.hasAttribute('data-user-role')) {
+            el.className = currentUser.role === 'super_admin'
+                ? 'text-xs px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
+                : 'text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30';
+        }
     });
 
     // Update zona display
@@ -178,29 +182,71 @@ function updateUserUI() {
     document.documentElement.classList.remove('auth-loading');
 }
 
-// ---- User Menu Toggle (Header) ----
-window.toggleUserMenu = function () {
+/**
+ * Toggles the user profile dropdown menu
+ */
+function toggleUserMenu() {
     const menu = document.getElementById('user-menu');
     if (!menu) return;
 
-    const isVisible = !menu.classList.contains('invisible');
-    if (isVisible) {
-        menu.classList.add('opacity-0', 'invisible', 'translate-y-2');
+    if (menu.classList.contains('invisible')) {
+        menu.classList.remove('invisible', 'opacity-0', 'translate-y-2');
+        menu.classList.add('opacity-100', 'translate-y-0');
     } else {
-        menu.classList.remove('opacity-0', 'invisible', 'translate-y-2');
+        menu.classList.add('invisible', 'opacity-0', 'translate-y-2');
+        menu.classList.remove('opacity-100', 'translate-y-0');
     }
+}
 
-    // Close when clicking outside
-    const closeMenu = (e) => {
-        if (!document.getElementById('user-profile-dropdown')?.contains(e.target)) {
-            menu.classList.add('opacity-0', 'invisible', 'translate-y-2');
-            document.removeEventListener('click', closeMenu);
+/**
+ * Handles clicks outside the user menu to close it
+ */
+document.addEventListener('click', (e) => {
+    const dropdown = document.getElementById('user-profile-dropdown');
+    const menu = document.getElementById('user-menu');
+    if (dropdown && !dropdown.contains(e.target)) {
+        if (menu && !menu.classList.contains('invisible')) {
+            menu.classList.add('invisible', 'opacity-0', 'translate-y-2');
+            menu.classList.remove('opacity-100', 'translate-y-0');
         }
-    };
-    if (!isVisible) {
-        setTimeout(() => document.addEventListener('click', closeMenu), 10);
     }
-};
+});
+
+/**
+ * Opens the profile detail modal
+ */
+function openProfileDetail() {
+    const modal = document.getElementById('profile-detail-modal');
+    if (!modal) return;
+
+    // Close dropdown first
+    toggleUserMenu();
+
+    // Populate modal data
+    const user = JSON.parse(localStorage.getItem('user_data') || '{}');
+    document.querySelectorAll('[data-user-name]').forEach(el => el.textContent = user.name || 'User');
+    document.querySelectorAll('[data-user-username]').forEach(el => el.textContent = `@${user.username || 'user'}`);
+    document.querySelectorAll('[data-user-role]').forEach(el => el.textContent = user.role || 'Moderator');
+    document.querySelectorAll('[data-user-email]').forEach(el => el.textContent = user.email || '-');
+    document.querySelectorAll('[data-user-zona]').forEach(el => el.textContent = user.zona || 'Semua Zona');
+    document.querySelectorAll('[data-user-avatar]').forEach(el => {
+        el.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'U')}&background=6366f1&color=fff&size=256`;
+    });
+
+    // Show modal
+    modal.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+}
+
+/**
+ * Closes the profile detail modal
+ */
+function closeProfileDetail() {
+    const modal = document.getElementById('profile-detail-modal');
+    if (!modal) return;
+    modal.classList.add('hidden');
+    document.body.style.overflow = '';
+}
 
 // ---- Check if current user is Super Admin ----
 function isSuperAdmin() {
