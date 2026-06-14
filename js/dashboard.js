@@ -599,32 +599,42 @@ async function submitDispute() {
 
 // ---- Preview via PDF.js ----
 function openPreview(fileId, fileName) {
-    acknowledgeFile(fileId);
-    const modal = document.getElementById('preview-modal');
-    const iframe = document.getElementById('preview-iframe');
-    const title = document.getElementById('preview-title');
-    const download = document.getElementById('preview-download');
+    try {
+        const modal = document.getElementById('preview-modal');
+        const iframe = document.getElementById('preview-iframe');
+        const title = document.getElementById('preview-title');
+        const download = document.getElementById('preview-download');
 
-    title.textContent = fileName;
+        if (!modal || !iframe) {
+            Toast.error('Preview modal tidak ditemukan.');
+            return;
+        }
 
-    // Reset iframe to avoid showing previous document
-    iframe.src = 'about:blank';
+        if (title) title.textContent = fileName;
 
-    const token = API.getToken();
-    const viewUrl = `${CONFIG.API_URL}/api/files/${fileId}/view?token=${token}`;
-    const downloadUrl = `${CONFIG.API_URL}/api/files/${fileId}/download?token=${token}`;
+        // Reset iframe to avoid showing previous document
+        iframe.src = 'about:blank';
 
-    download.href = downloadUrl;
+        const token = API.getToken();
+        const viewUrl = `${CONFIG.API_URL}/api/files/${fileId}/view?token=${token}`;
+        const downloadUrl = `${CONFIG.API_URL}/api/files/${fileId}/download?token=${token}`;
 
-    // Show modal
-    modal.classList.remove('hidden');
-    document.body.style.overflow = 'hidden';
+        if (download) download.href = downloadUrl;
 
-    // Use a small timeout to ensure the layout is ready before the stream starts
-    setTimeout(() => {
-        iframe.src = viewUrl;
-    }, 100);
+        // Show modal
+        modal.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+
+        // Use a small timeout to ensure the layout is ready before the stream starts
+        setTimeout(() => {
+            iframe.src = viewUrl;
+        }, 100);
+    } catch (err) {
+        console.error('[Preview Error]', err);
+        Toast.error('Gagal membuka preview: ' + err.message);
+    }
 }
+
 
 function closePreview() {
     const modal = document.getElementById('preview-modal');
