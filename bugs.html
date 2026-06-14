@@ -272,11 +272,14 @@
                         </td>
                         <td class="py-5 align-top text-center">
                             ${b.tautan_file ? `
-                                <div class="inline-block relative group/img cursor-pointer" onclick="openImageModal('${API.getAuthenticatedUrl(b.tautan_file)}')">
-                                    <img src="${API.getAuthenticatedUrl(b.tautan_file)}" class="w-12 h-12 object-cover rounded-xl border border-gray-100 group-hover/img:brightness-75 transition-all">
-                                    <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity">
-                                        <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7"/></svg>
+                                <div class="inline-flex flex-col items-center gap-1 group/img cursor-pointer" onclick="openImageModal('${API.getAuthenticatedUrl(b.tautan_file)}')">
+                                    <div class="relative">
+                                        <img src="${API.getAuthenticatedUrl(b.tautan_file)}" class="w-12 h-12 object-cover rounded-xl border border-gray-100 group-hover/img:brightness-75 transition-all">
+                                        <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity">
+                                            <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7"/></svg>
+                                        </div>
                                     </div>
+                                    <span class="text-[9px] font-black text-blue-500 uppercase tracking-widest opacity-60 group-hover/img:opacity-100 transition-opacity">Lihat Lampiran</span>
                                 </div>
                             ` : `<span class="text-[10px] font-black text-gray-200 uppercase tracking-widest">No Bukti</span>`}
                         </td>
@@ -284,8 +287,13 @@
                         <td class="pr-8 py-5 align-top text-right">
                             ${isAdmin ? `
                                 <div class="flex items-center justify-end gap-2">
+                                    ${b.tautan_file ? `
+                                        <button onclick="openImageModal('${API.getAuthenticatedUrl(b.tautan_file)}')" class="p-2.5 rounded-xl bg-blue-50 border border-blue-100 text-blue-600 hover:bg-blue-600 hover:text-white transition-all shadow-sm active:scale-95" title="Lihat Bukti Foto">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                        </button>
+                                    ` : ''}
                                     ${b.status === 'Pending' ? `
-                                        <button onclick="updateBugStatus(${b.id}, 'Diproses')" class="p-2.5 rounded-xl bg-white border border-gray-100 text-blue-600 hover:bg-blue-600 hover:text-white transition-all shadow-sm active:scale-95" title="Tandai Diproses">
+                                        <button onclick="updateBugStatus(${b.id}, 'Diproses')" class="p-2.5 rounded-xl bg-white border border-gray-100 text-amber-600 hover:bg-amber-600 hover:text-white transition-all shadow-sm active:scale-95" title="Tandai Diproses">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                                         </button>
                                     ` : ''}
@@ -294,7 +302,7 @@
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
                                         </button>
                                     ` : ''}
-                                    <button onclick="deleteBug(${b.id})" class="p-2.5 rounded-xl bg-white border border-gray-100 text-gray-400 hover:bg-red-900 hover:text-white transition-all shadow-sm active:scale-95" title="Hapus">
+                                    <button onclick="deleteBug(${b.id})" class="p-2.5 rounded-xl bg-white border border-gray-100 text-gray-400 hover:bg-red-600 hover:text-white transition-all shadow-sm active:scale-95" title="Hapus">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                                     </button>
                                 </div>
