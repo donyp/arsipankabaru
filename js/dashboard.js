@@ -806,6 +806,10 @@ async function loadAnalyticsChart() {
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false,
+                },
                 animation: {
                     duration: 800,
                     easing: 'easeOutQuart'
