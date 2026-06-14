@@ -44,19 +44,41 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 
-// ---- Set Current Date ----
+// ---- Set Current Date & Time-based Greeting ----
 function setCurrentDate() {
+    const now = new Date();
+
+    // 1. Current Page Header Date (if still exists)
     const el = document.getElementById('current-date');
     if (el) {
-        el.textContent = new Date().toLocaleDateString('id-ID', {
+        el.textContent = now.toLocaleDateString('id-ID', {
             weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
         });
     }
 
-    // Auto-fill filter-date-end to today
+    // 2. Banner Dynamic Greeting
+    const greetingEl = document.getElementById('time-greeting');
+    if (greetingEl) {
+        const hour = now.getHours();
+        let greeting = 'Selamat Datang';
+        if (hour >= 4 && hour < 11) greeting = 'Pagi';
+        else if (hour >= 11 && hour < 18) greeting = 'Siang';
+        else greeting = 'Malam';
+        greetingEl.textContent = greeting;
+    }
+
+    // 3. Banner Date (Indonesian Format)
+    const bannerDateEl = document.getElementById('banner-date');
+    if (bannerDateEl) {
+        bannerDateEl.textContent = now.toLocaleDateString('id-ID', {
+            weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+        });
+    }
+
+    // 4. Auto-fill filter-date-end to today
     const endDate = document.getElementById('filter-date-end');
     if (endDate) {
-        endDate.value = new Date().toISOString().split('T')[0];
+        endDate.value = now.toISOString().split('T')[0];
     }
 }
 

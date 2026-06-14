@@ -51,18 +51,60 @@
                         </svg>
                     </button>
                     <div>
-                        <h2 class="text-xl font-bold text-gray-900">Manajemen User</h2>
-                        <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Kelola akses
-                            pengguna sistem</p>
+                        <h2 class="text-sm font-bold text-gray-400 uppercase tracking-widest">Manajemen User</h2>
                     </div>
                 </div>
-                <button onclick="openUserModal()"
-                    class="btn-primary px-4 py-2 rounded-xl text-sm font-medium flex items-center gap-2">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                    </svg>
-                    Tambah User
-                </button>
+                <div class="flex items-center gap-4">
+                    <button onclick="openUserModal()"
+                        class="btn-primary px-4 py-2 rounded-xl text-sm font-medium flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                        </svg>
+                        Tambah User
+                    </button>
+
+                    <div class="h-6 w-px bg-gray-100 mx-1"></div>
+
+                    <!-- User Profile Dropdown -->
+                    <div class="relative group" id="user-profile-dropdown">
+                        <button onclick="toggleUserMenu()"
+                            class="flex items-center gap-3 p-1 pl-2 pr-3 rounded-full hover:bg-gray-50 transition-all border border-transparent hover:border-gray-100">
+                            <img data-user-avatar
+                                src="https://ui-avatars.com/api/?name=User&background=6366f1&color=fff" alt="avatar"
+                                class="w-8 h-8 rounded-full shadow-sm">
+                            <span data-user-name
+                                class="text-sm font-bold text-gray-700 hidden sm:block">Memuat...</span>
+                            <svg class="w-4 h-4 text-gray-400 transition-transform group-hover:translate-y-0.5"
+                                fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </button>
+                        <!-- Dropdown Menu -->
+                        <div id="user-menu"
+                            class="absolute right-0 mt-2 w-48 bg-white border border-gray-100 rounded-2xl shadow-xl opacity-0 invisible translate-y-2 transition-all duration-200 z-50">
+                            <div class="p-2">
+                                <a href="#"
+                                    class="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-50 rounded-xl transition-all">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                    </svg>
+                                    Profil
+                                </a>
+                                <div class="h-px bg-gray-50 my-1 mx-2"></div>
+                                <button onclick="logout()"
+                                    class="flex items-center gap-3 px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 rounded-xl w-full text-left transition-all">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                                    </svg>
+                                    Logout
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </header>
 

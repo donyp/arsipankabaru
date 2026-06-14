@@ -102,6 +102,11 @@ function updateUserUI() {
         el.textContent = currentUser.email;
     });
 
+    // Update user username displays
+    document.querySelectorAll('[data-user-username]').forEach(el => {
+        el.textContent = currentUser.username || currentUser.email.split('@')[0];
+    });
+
     // Update avatar
     document.querySelectorAll('[data-user-avatar]').forEach(el => {
         el.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser.name)}&background=6366f1&color=fff&size=80`;
@@ -172,6 +177,30 @@ function updateUserUI() {
     // --- RELEASE CLOAK ---
     document.documentElement.classList.remove('auth-loading');
 }
+
+// ---- User Menu Toggle (Header) ----
+window.toggleUserMenu = function () {
+    const menu = document.getElementById('user-menu');
+    if (!menu) return;
+
+    const isVisible = !menu.classList.contains('invisible');
+    if (isVisible) {
+        menu.classList.add('opacity-0', 'invisible', 'translate-y-2');
+    } else {
+        menu.classList.remove('opacity-0', 'invisible', 'translate-y-2');
+    }
+
+    // Close when clicking outside
+    const closeMenu = (e) => {
+        if (!document.getElementById('user-profile-dropdown')?.contains(e.target)) {
+            menu.classList.add('opacity-0', 'invisible', 'translate-y-2');
+            document.removeEventListener('click', closeMenu);
+        }
+    };
+    if (!isVisible) {
+        setTimeout(() => document.addEventListener('click', closeMenu), 10);
+    }
+};
 
 // ---- Check if current user is Super Admin ----
 function isSuperAdmin() {

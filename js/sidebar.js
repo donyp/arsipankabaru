@@ -165,21 +165,8 @@ console.log("Sidebar Version 3.0.0 - Light Theme");
                 ${navHTML}
             </nav>
 
-            <div class="p-4 border-t border-gray-200">
-                <div class="flex items-center gap-3">
-                    <img data-user-avatar src="" alt="avatar" class="w-9 h-9 rounded-full ring-2 ring-blue-500/20">
-                    <div class="flex-1 min-w-0">
-                        <p data-user-name class="text-sm font-medium text-gray-900 truncate">Loading...</p>
-                        <span data-user-role class="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-600">-</span>
-                    </div>
-                    <button onclick="logout()" title="Logout"
-                        class="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                        </svg>
-                    </button>
-                </div>
+            <div class="p-4 border-t border-gray-200 text-center">
+                <p class="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Arsip ANKA v3.0</p>
             </div>
         `;
 
