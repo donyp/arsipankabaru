@@ -144,9 +144,12 @@
                                 </svg>
                             </div>
                             <div class="flex-1">
-                                <p class="text-[10px] font-black text-red-600 uppercase tracking-widest leading-none mb-1">System Maintenance</p>
-                                <p class="text-[11px] font-bold text-red-500/70 leading-normal">Hanya Admin/Moderator yang diizinkan masuk.</p>
-                                ${sinceText ? `<p class="text-[9px] font-medium text-red-400 mt-1">sejak : ${sinceText.replace('sejak : ', '')}</p>` : ''}
+                                <p class="text-[10px] font-black text-red-600 uppercase tracking-widest leading-none mb-2">System Maintenance</p>
+                                <p class="text-[12px] font-bold text-red-700 leading-tight">Optimasi Sistem Sedang Berjalan</p>
+                                <p class="text-[10px] font-medium text-red-500/80 leading-relaxed mt-1">Akses sementara dibatasi untuk keperluan teknis. Silakan kembali lagi nanti.</p>
+                                ${sinceText ? `<p class="text-[9px] font-bold text-red-400 mt-2 flex items-center gap-1.5 opacity-80 uppercase tracking-wider">
+                                    <span class="w-1 h-1 rounded-full bg-red-300"></span> ${sinceText}
+                                </p>` : ''}
                             </div>
                         </div>
                     `;
