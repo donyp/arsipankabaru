@@ -157,13 +157,21 @@ function scanFilename(name) {
     else if (/^NON/i.test(firstWord)) result.tipe = 'NON_PPN';
 
     // 2. Detect Toko (Match against window._allTokos)
-    if (window._allTokos) {
-        // Remove suffix like (1), (2) etc before matching for better accuracy
-        const nameToMatch = cleanName.replace(/\(\d+\)$/, "").trim();
-        const matchedToko = window._allTokos.find(t =>
-            nameToMatch.toLowerCase().includes(t.nama.toLowerCase())
-        );
-        if (matchedToko) result.toko = matchedToko;
+    if (window._allTokos && window._allTokos.length > 0) {
+        // Remove suffix like (1), (2) etc AND normalize multiple spaces
+        const nameToMatch = cleanName.replace(/\(\d+\)$/, "").replace(/\s+/g, ' ').trim().toLowerCase();
+
+        // Sort tokos by name length descending to catch multi-word matches first (e.g., "CIPONDOH BARU" before "CIPONDOH")
+        const sortedTokos = [...window._allTokos].sort((a, b) => b.nama.length - a.nama.length);
+
+        for (const t of sortedTokos) {
+            const tokoName = t.nama.toLowerCase().trim();
+            // Match exact word or part of name
+            if (nameToMatch.includes(tokoName)) {
+                result.toko = t;
+                break;
+            }
+        }
     }
 
     // 3. Detect Nominal (Look for pattern X.XXX.XXX)
