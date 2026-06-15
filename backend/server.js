@@ -419,9 +419,20 @@ app.get('/api/files', authenticateToken, authorizeZone, async (req, res) => {
             query = query.ilike('status', '%Anomali%');
         }
 
-        // Search
+        // Search Logic: Strict AND match for multi-term queries
         if (req.query.search) {
-            query = query.ilike('nama_file', `%${req.query.search}%`);
+            const searchVal = req.query.search.trim().toLowerCase();
+            if (searchVal) {
+                // Split by spaces to handle multiple terms (e.g. "Deltamas 14.223")
+                const terms = searchVal.split(/\s+/).filter(t => t.length > 0);
+
+                // Apply 'ilike' for EACH term (AND logic)
+                for (const term of terms) {
+                    query = query.ilike('nama_file', `%${term}%`);
+                }
+
+                console.log(`[Search] Query: "${searchVal}" | Split into ${terms.length} terms: [${terms.join(', ')}]`);
+            }
         }
 
         // Pagination
