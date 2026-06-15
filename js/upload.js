@@ -5,6 +5,16 @@
 
 let selectedFiles = [];
 
+/**
+ * Helper to convert Date object to YYYY-MM-DD string in LOCAL timezone
+ */
+function toLocalYYYYMMDD(date) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+}
+
 // ---- Init ----
 document.addEventListener('DOMContentLoaded', async () => {
     const user = await initAuth();
@@ -64,8 +74,6 @@ function handleFileSelect(input) {
 }
 
 function addFiles(files) {
-    const category = document.getElementById('upload-category')?.value || 'INVOICE';
-
     const newFiles = Array.from(files).filter(f => {
         const ext = f.name.split('.').pop().toLowerCase();
         if (ext !== 'pdf' && ext !== 'jpg' && ext !== 'jpeg' && ext !== 'png') {
@@ -83,7 +91,8 @@ function addFiles(files) {
         return {
             file: f,
             toko: scan.toko || null,
-            date: scan.date || new Date().toISOString().split('T')[0],
+            date: scan.date || toLocalYYYYMMDD(new Date()),
+            isDateDetected: scan.isDateDetected,
             tipe_ppn: scan.tipe || 'REGULAR',
             nominal: scan.nominal || 0,
             isAutoDetected: !!scan.toko
@@ -103,16 +112,17 @@ function scanFilename(name) {
         tipe: 'REGULAR',
         toko: null,
         nominal: 0,
-        date: null
+        date: null,
+        isDateDetected: false
     };
 
     if (!name) return result;
     const cleanName = name.replace(/\.[^/.]+$/, ""); // Remove extension
-    const parts = cleanName.split(/\s+/);
 
     // 1. Detect Type (PPN/NON)
-    if (/^PPN/i.test(parts[0])) result.tipe = 'PPN';
-    else if (/^NON/i.test(parts[0])) result.tipe = 'NON_PPN';
+    const firstWord = cleanName.split(/\s+/)[0];
+    if (/^PPN/i.test(firstWord)) result.tipe = 'PPN';
+    else if (/^NON/i.test(firstWord)) result.tipe = 'NON_PPN';
 
     // 2. Detect Toko (Match against window._allTokos)
     if (window._allTokos) {
@@ -137,14 +147,12 @@ function scanFilename(name) {
         'may': 4, 'aug': 7, 'oct': 9, 'dec': 11
     };
 
-    // Try finding date pattern: "12 Mei" (Now without strict $ anchor, using word boundaries)
     const dateMatch = cleanName.match(/\b(\d{1,2})\s+([a-zA-Z]{3,})\b/i);
     if (dateMatch) {
         const day = parseInt(dateMatch[1]);
         const monthName = dateMatch[2].toLowerCase();
         let monthIdx = -1;
 
-        // Try exact match or prefix
         if (months[monthName] !== undefined) {
             monthIdx = months[monthName];
         } else {
@@ -155,17 +163,19 @@ function scanFilename(name) {
         if (monthIdx !== -1) {
             const now = new Date();
             const d = new Date(now.getFullYear(), monthIdx, day);
-            result.date = d.toISOString().split('T')[0];
+            result.date = toLocalYYYYMMDD(d);
+            result.isDateDetected = true;
         }
     } else {
         // Fallback for numeric format like 12-05 or 12/05
-        const numericMatch = cleanName.match(/(\d{1,2})[-/](\d{1,2})/);
+        const numericMatch = cleanName.match(/\b(\d{1,2})[-/](\d{1,2})\b/);
         if (numericMatch) {
             const day = parseInt(numericMatch[1]);
             const month = parseInt(numericMatch[2]) - 1;
             const now = new Date();
             const d = new Date(now.getFullYear(), month, day);
-            result.date = d.toISOString().split('T')[0];
+            result.date = toLocalYYYYMMDD(d);
+            result.isDateDetected = true;
         }
     }
 
@@ -173,7 +183,7 @@ function scanFilename(name) {
 }
 
 function removeFile(index, e) {
-    e.stopPropagation();
+    if (e) e.stopPropagation();
     selectedFiles.splice(index, 1);
     updateFileUI();
 }
@@ -185,14 +195,28 @@ function clearFile(e) {
 }
 
 function setFileToko(index, tokoId) {
-    const toko = window._allTokos.find(t => t.id == tokoId);
-    if (toko) {
-        selectedFiles[index].toko = toko;
+    if (!tokoId) {
+        selectedFiles[index].toko = null;
+        selectedFiles[index].isAutoDetected = false;
+    } else {
+        const toko = window._allTokos.find(t => t.id == tokoId);
+        if (toko) {
+            selectedFiles[index].toko = toko;
+            selectedFiles[index].isAutoDetected = false;
+        }
     }
+    updateFileUI();
 }
 
 function setFileDate(index, dateValue) {
     selectedFiles[index].date = dateValue;
+    selectedFiles[index].isDateDetected = false; // Switch to manual mode if edited
+    updateFileUI();
+}
+
+function unlockDate(index) {
+    selectedFiles[index].isDateDetected = false;
+    updateFileUI();
 }
 
 function updateFileUI() {
@@ -210,7 +234,6 @@ function updateFileUI() {
         return;
     }
 
-    // Show file info, hide drop prompt
     fileInfo.classList.remove('hidden');
     dropZoneContent.classList.add('hidden');
     if (submitBtn) submitBtn.disabled = false;
@@ -219,6 +242,15 @@ function updateFileUI() {
         const tokoOptions = window._allTokos.map(t => `<option value="${t.id}" ${item.toko && item.toko.id === t.id ? 'selected' : ''}>${t.nama}</option>`).join('');
         const ext = item.file.name.split('.').pop().toLowerCase();
         const isPdf = ext === 'pdf';
+
+        // Month name for display badge
+        let displayDate = item.date;
+        try {
+            const dateParts = item.date.split('-'); // YYYY-MM-DD
+            const d = new Date(dateParts[0], dateParts[1] - 1, dateParts[2]);
+            const monthNames = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
+            displayDate = `${parseInt(dateParts[2])} ${monthNames[d.getMonth()]}`;
+        } catch (e) { }
 
         return `
         <li class="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 rounded-2xl bg-gray-50 border border-gray-100 hover:border-blue-200 transition-all group/item shadow-sm">
@@ -231,10 +263,11 @@ function updateFileUI() {
                 <div class="flex flex-col truncate flex-1 min-w-0">
                     <p class="text-[13px] font-bold text-gray-900 truncate mb-2 group-hover/item:text-blue-600 transition-colors uppercase">${item.file.name}</p>
                     <div class="flex flex-wrap items-center gap-2">
+                        <!-- Toko Badge -->
                         ${item.isAutoDetected ? `
                             <div class="flex items-center gap-1.5 bg-emerald-50 text-emerald-600 px-2.5 py-1 rounded-lg border border-emerald-100 shadow-sm animate-fade-in">
                                 <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
-                                <span class="text-[10px] font-black uppercase tracking-widest">${item.toko.nama}</span>
+                                <span class="text-[10px] font-black uppercase tracking-widest">${item.toko ? item.toko.nama : 'Unknown'}</span>
                             </div>
                         ` : `
                             <select onchange="setFileToko(${i}, this.value)" class="bg-white border border-gray-200 text-gray-700 text-[10px] font-bold rounded-lg px-2 py-1 outline-none focus:ring-2 focus:ring-blue-100 hover:bg-gray-50 transition-all cursor-pointer shadow-sm">
@@ -243,13 +276,24 @@ function updateFileUI() {
                             </select>
                         `}
                         
+                        <!-- Nominal Badge -->
                         <div class="flex items-center gap-1.5 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-100 shadow-sm font-bold text-blue-600">
                              <span class="text-[10px] tracking-widest">${item.nominal > 0 ? formatCurrency(item.nominal) : 'RP 0'}</span>
                         </div>
 
-                        <div class="flex items-center gap-1.5 bg-white px-2 py-0.5 rounded-lg border border-gray-200 shadow-sm">
-                            <input type="date" value="${item.date}" onchange="setFileDate(${i}, this.value)" class="bg-transparent border-0 text-[10px] font-bold text-gray-700 p-0 outline-none w-28 cursor-pointer">
-                        </div>
+                        <!-- Date Badge (Amber Locked Style) -->
+                        ${item.isDateDetected ? `
+                            <div onclick="unlockDate(${i})" class="flex items-center gap-1.5 bg-amber-50 text-amber-600 px-2.5 py-1 rounded-lg border border-amber-100 shadow-sm animate-fade-in cursor-pointer hover:bg-amber-100 transition-colors">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                </svg>
+                                <span class="text-[10px] font-black uppercase tracking-widest">${displayDate}</span>
+                            </div>
+                        ` : `
+                            <div class="flex items-center gap-1.5 bg-white px-2 py-0.5 rounded-lg border border-gray-200 shadow-sm">
+                                <input type="date" value="${item.date}" onchange="setFileDate(${i}, this.value)" class="bg-transparent border-0 text-[10px] font-bold text-gray-700 p-0 outline-none w-28 cursor-pointer">
+                            </div>
+                        `}
 
                         <div class="flex items-center gap-1.5 bg-gray-100 px-2 py-1 rounded-lg border border-gray-200">
                             <span class="text-[9px] text-gray-400 font-bold uppercase tracking-widest leading-none">${formatFileSize(item.file.size)}</span>
@@ -269,18 +313,6 @@ function updateFileUI() {
     }).join('');
 }
 
-function setFileToko(index, tokoId) {
-    if (!tokoId) {
-        selectedFiles[index].toko = null;
-        selectedFiles[index].isAutoDetected = false;
-    } else {
-        const toko = window._allTokos.find(t => t.id === tokoId);
-        selectedFiles[index].toko = toko;
-        selectedFiles[index].isAutoDetected = false;
-    }
-    updateFileUI();
-}
-
 function formatFileSize(bytes) {
     if (bytes < 1024) return bytes + ' B';
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
@@ -294,23 +326,16 @@ function setupForm() {
 
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const category = document.getElementById('upload-category')?.value || 'INVOICE';
+        const category = 'INVOICE'; // Always Invoice for this page
 
         if (selectedFiles.length === 0) {
             Toast.warning('Pilih file terlebih dahulu.');
             return;
         }
 
-        // Validate all files have detected toko
         const undetectedToko = selectedFiles.filter(f => !f.toko).length;
         if (undetectedToko > 0) {
             Toast.error(`Pilih toko untuk semua ${undetectedToko} file.`);
-            return;
-        }
-
-        const dateVal = document.getElementById('upload-date')?.value;
-        if (!dateVal) {
-            Toast.error('Tentukan tanggal dokumen.');
             return;
         }
 
@@ -334,12 +359,12 @@ function setupForm() {
                 formData.append('zona_id', item.toko.zona_id);
                 formData.append('toko_id', item.toko.id);
                 formData.append('category', category);
-                formData.append('tanggal_dokumen', item.date || new Date().toISOString().split('T')[0]);
-                formData.append('tanggal_upload', new Date().toISOString().split('T')[0]);
+                formData.append('tanggal_dokumen', item.date || toLocalYYYYMMDD(new Date()));
+                formData.append('tanggal_upload', toLocalYYYYMMDD(new Date()));
 
-                // NEW: Send scanned metadata
+                // Meta scanned
                 formData.append('total_jual', item.nominal || 0);
-                formData.append('tipe_ppn', item.tipe_ppn || 'REGULAR');
+                formData.append('tipe_ppn', (item.tipe_ppn || 'REGULAR').toUpperCase());
 
                 await API.upload('/api/files/upload', formData);
                 uploaded++;
@@ -363,10 +388,10 @@ function setupForm() {
         if (progressContainer) progressContainer.classList.add('hidden');
         btn.disabled = false;
         btn.innerHTML = `
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
             </svg>
-            UPLOAD SEMUA FILE
+            Mulai Upload Antrean
         `;
         loadRecentUploads();
     });
