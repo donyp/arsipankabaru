@@ -215,6 +215,9 @@
         } catch (err) { }
     }
 
+    // Polling for updates every 30 seconds
+    setInterval(loadGlobalBroadcast, 30000);
+
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', inject);
     } else {

@@ -128,23 +128,44 @@ function scanFilename(name) {
         result.nominal = parseInt(nominalMatch[0].replace(/\./g, ''));
     }
 
-    // 4. Detect Date (e.g., "12 Mei")
+    // 4. Detect Date (e.g., "12 Mei" or "12-05")
     const months = {
-        'jan': 0, 'feb': 1, 'mar': 2, 'apr': 3, 'mei': 4, 'may': 4,
-        'jun': 5, 'jul': 6, 'agu': 7, 'aug': 7, 'sep': 8, 'okt': 9, 'oct': 9,
-        'nov': 10, 'des': 11, 'dec': 11
+        'jan': 0, 'feb': 1, 'mar': 2, 'apr': 3, 'mei': 4, 'jun': 5,
+        'jul': 6, 'agu': 7, 'sep': 8, 'okt': 9, 'nov': 10, 'des': 11,
+        'januari': 0, 'februari': 1, 'maret': 2, 'april': 3, 'mei': 4, 'juni': 5,
+        'juli': 6, 'agustus': 7, 'september': 8, 'oktober': 9, 'november': 10, 'desember': 11,
+        'may': 4, 'aug': 7, 'oct': 9, 'dec': 11
     };
 
-    const dateMatch = cleanName.match(/(\d{1,2})\s+([a-zA-Z]{3,})/);
+    // Try finding date pattern at the end: "12 Mei"
+    const dateMatch = cleanName.match(/(\d{1,2})\s+([a-zA-Z]{3,})$/i);
     if (dateMatch) {
         const day = parseInt(dateMatch[1]);
-        const monthStr = dateMatch[2].toLowerCase().substring(0, 3);
-        if (months[monthStr] !== undefined) {
-            const d = new Date();
-            d.setDate(day);
-            d.setMonth(months[monthStr]);
-            // If the date is in the future relative to now, it's likely from last year
-            // But usually, it's the current year.
+        const monthName = dateMatch[2].toLowerCase();
+        let monthIdx = -1;
+
+        // Try exact match or prefix
+        if (months[monthName] !== undefined) {
+            monthIdx = months[monthName];
+        } else {
+            const prefix = monthName.substring(0, 3);
+            if (months[prefix] !== undefined) monthIdx = months[prefix];
+        }
+
+        if (monthIdx !== -1) {
+            const now = new Date();
+            // Use constructor to avoid rollover bugs (e.g. if today is 31 and we set month to Feb)
+            const d = new Date(now.getFullYear(), monthIdx, day);
+            result.date = d.toISOString().split('T')[0];
+        }
+    } else {
+        // Fallback for numeric format like 12-05 or 12/05
+        const numericMatch = cleanName.match(/(\d{1,2})[-/](\d{1,2})/);
+        if (numericMatch) {
+            const day = parseInt(numericMatch[1]);
+            const month = parseInt(numericMatch[2]) - 1;
+            const now = new Date();
+            const d = new Date(now.getFullYear(), month, day);
             result.date = d.toISOString().split('T')[0];
         }
     }
