@@ -16,6 +16,55 @@ let isFetching = false;
 // Zona cache for labels
 window._zonaCache = [];
 
+// ---- Show Notification Detail Modal ----
+function showNotifDetail(event, header, details) {
+    if (event) event.stopPropagation(); // Prevent marking notification as read
+
+    Swal.fire({
+        title: '<div class="flex items-center gap-2 px-1"><span class="text-xs font-black text-gray-900 uppercase">Detail Perbaikan</span></div>',
+        html: `
+            <div class="text-left py-2">
+                <div class="flex items-center gap-3 mb-4 p-4 bg-emerald-50 rounded-2xl border border-emerald-100">
+                    <div class="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-sm">
+                        <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    </div>
+                    <div>
+                        <p class="text-[10px] font-black text-emerald-800 uppercase tracking-widest leading-none">Status</p>
+                        <p class="text-xs font-bold text-emerald-700 mt-1">Sistem Kembali Online</p>
+                    </div>
+                </div>
+                
+                <div class="space-y-4">
+                    <div>
+                        <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1 ml-1">Update Utama</label>
+                        <div class="bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-xs font-bold text-gray-800">
+                            ${header}
+                        </div>
+                    </div>
+                    
+                    ${details ? `
+                    <div>
+                        <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1 ml-1">Rincian Perbaikan</label>
+                        <div class="bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-xs text-gray-600 leading-relaxed max-h-48 overflow-y-auto whitespace-pre-wrap font-medium">
+                            ${details}
+                        </div>
+                    </div>
+                    ` : ''}
+                </div>
+            </div>
+        `,
+        confirmButtonText: 'Tutup',
+        confirmButtonColor: '#10b981',
+        customClass: {
+            container: 'z-[9999]',
+            popup: 'rounded-[1.5rem] border-0 shadow-2xl',
+            confirmButton: 'rounded-xl text-[10px] font-black uppercase px-8 py-3'
+        }
+    });
+}
+
 // ---- Initialize Dashboard ----
 document.addEventListener('DOMContentLoaded', async () => {
     const user = await initAuth();
@@ -528,7 +577,11 @@ function renderNotifications() {
                         <div class="flex-1 min-w-0">
                             <div class="flex items-center justify-between gap-1.5">
                                 <span class="text-[11px] font-black text-gray-900 leading-none">✅ Perbaikan Selesai</span>
-                                ${details ? `<span class="text-[8px] font-black text-emerald-500 bg-emerald-50 px-1.5 py-0.5 rounded-full animate-pulse">DETAIL</span>` : ''}
+                                ${details ? `
+                                    <button onclick="showNotifDetail(event, '${header.replace(/'/g, "\\'")}', '${details.replace(/'/g, "\\'").replace(/\n/g, '<br>')}')" 
+                                            class="text-[8px] font-black text-emerald-500 bg-emerald-50 px-1.5 py-0.5 rounded-full animate-pulse hover:bg-emerald-500 hover:text-white transition-all">
+                                        DETAIL
+                                    </button>` : ''}
                             </div>
                             <p class="text-[10px] font-bold text-emerald-600 mt-1 line-clamp-1">${header}</p>
                             <p class="text-[9px] text-gray-400 mt-1 font-bold uppercase">${time}</p>
