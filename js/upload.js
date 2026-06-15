@@ -19,6 +19,7 @@ function toLocalYYYYMMDD(date) {
 document.addEventListener('DOMContentLoaded', async () => {
     const user = await initAuth();
     if (!user) return;
+    window._currentUser = user; // Store for global access
 
     // Allow only authorized roles
     const allowedRoles = ['super_admin', 'moderator', 'admin_zona'];
@@ -105,23 +106,29 @@ function addFiles(files) {
     updateFileUI();
 
     // Trigger background duplicate check for new files
-    newFiles.forEach((item, index) => {
-        const actualIndex = startIndex + index;
-        if (item.toko) {
-            checkBackgroundDuplicate(actualIndex, item.file.name, item.toko.zona_id);
+    const currentUser = window._currentUser || { zona_id: 1 }; // Fallback to Zona 1 if unknown
+    newFiles.forEach((item) => {
+        // Use toko.zona_id if detected, else use user's own zona_id
+        const targetZonaId = item.toko ? item.toko.zona_id : currentUser.zona_id;
+        if (targetZonaId) {
+            checkBackgroundDuplicate(item.file.name, targetZonaId);
         }
     });
 }
 
 /**
- * Silent background check for existing files
+ * Silent background check for existing files (Safe version: uses filename matching)
  */
-async function checkBackgroundDuplicate(index, name, zonaId) {
+async function checkBackgroundDuplicate(filename, zonaId) {
     try {
-        const res = await API.get(`/api/files/check-duplicate?name=${encodeURIComponent(name)}&zona_id=${zonaId}`);
+        const res = await API.get(`/api/files/check-duplicate?name=${encodeURIComponent(filename)}&zona_id=${zonaId}`);
         if (res && res.exists) {
-            selectedFiles[index].isDuplicate = true;
-            updateFileUI(); // Silent update without animations
+            // Find the file by name in the current queue and mark as duplicate
+            const fileIndex = selectedFiles.findIndex(f => f.file.name === filename);
+            if (fileIndex !== -1) {
+                selectedFiles[fileIndex].isDuplicate = true;
+                updateFileUI(); // Silent update
+            }
         }
     } catch (err) {
         console.error('Duplicate check error:', err);
@@ -151,8 +158,10 @@ function scanFilename(name) {
 
     // 2. Detect Toko (Match against window._allTokos)
     if (window._allTokos) {
+        // Remove suffix like (1), (2) etc before matching for better accuracy
+        const nameToMatch = cleanName.replace(/\(\d+\)$/, "").trim();
         const matchedToko = window._allTokos.find(t =>
-            cleanName.toLowerCase().includes(t.nama.toLowerCase())
+            nameToMatch.toLowerCase().includes(t.nama.toLowerCase())
         );
         if (matchedToko) result.toko = matchedToko;
     }

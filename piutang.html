@@ -325,19 +325,22 @@
             selectedPiutangFiles = [...selectedPiutangFiles, ...newFiles];
             updatePiutangFileUI();
 
-            // Trigger background duplicate check
-            newFiles.forEach((item, index) => {
-                const actualIndex = startIndex + index;
-                checkPiutangBackgroundDuplicate(actualIndex, item.file.name, getEffectiveZonaId());
+            // Trigger background duplicate check (with user zone fallback)
+            const targetZona = getEffectiveZonaId();
+            newFiles.forEach((item) => {
+                checkPiutangBackgroundDuplicate(item.file.name, targetZona);
             });
         }
 
-        async function checkPiutangBackgroundDuplicate(index, name, zonaId) {
+        async function checkPiutangBackgroundDuplicate(filename, zonaId) {
             try {
-                const res = await API.get(`/api/files/check-duplicate?name=${encodeURIComponent(name)}&zona_id=${zonaId}`);
+                const res = await API.get(`/api/files/check-duplicate?name=${encodeURIComponent(filename)}&zona_id=${zonaId}`);
                 if (res && res.exists) {
-                    selectedPiutangFiles[index].isDuplicate = true;
-                    updatePiutangFileUI();
+                    const fileIndex = selectedPiutangFiles.findIndex(f => f.file.name === filename);
+                    if (fileIndex !== -1) {
+                        selectedPiutangFiles[fileIndex].isDuplicate = true;
+                        updatePiutangFileUI();
+                    }
                 }
             } catch (err) {
                 console.error('Duplicate check error:', err);
