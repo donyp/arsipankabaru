@@ -291,7 +291,7 @@ async function loadArchives(append = false) {
             zona_id: getVal('filter-zona'),
             toko_id: getVal('filter-toko'),
             tipe_ppn: getVal('filter-tipe'),
-            search: (getVal('search-input') || getVal('search-input-mobile')).toLowerCase(),
+            search: (document.getElementById('dashboard-search-input')?.value || '').toLowerCase(),
             // Date bounds
             start_date: getVal('filter-date-start'),
             end_date: getVal('filter-date-end')
@@ -1879,11 +1879,9 @@ async function toggleMaintenance() {
 
 // ---- Search Synchronization ----
 function syncSearch(value) {
-    const mainSearch = document.getElementById('search-input');
     const dashboardSearch = document.getElementById('dashboard-search-input');
 
-    // Update both inputs to stay in sync
-    if (mainSearch) mainSearch.value = value;
+    // Update input to stay in sync (useful for programmatic calls)
     if (dashboardSearch) dashboardSearch.value = value;
 
     // Trigger search logic
