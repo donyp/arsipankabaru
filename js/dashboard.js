@@ -74,6 +74,15 @@ function showNotifDetail(event, header, details, id = null) {
     });
 }
 
+// ---- Toggle Inline Notification Detail Box ----
+function toggleInlineDetail(event, id) {
+    if (event) event.stopPropagation();
+    const box = document.getElementById(`detail-box-${id}`);
+    if (box) {
+        box.classList.toggle('hidden');
+    }
+}
+
 // ---- Initialize Dashboard ----
 document.addEventListener('DOMContentLoaded', async () => {
     const user = await initAuth();
@@ -589,13 +598,20 @@ function renderNotifications() {
                             <div class="flex items-center justify-between gap-1.5">
                                 <span class="text-[11px] font-black text-gray-900 leading-none">✅ Perbaikan Selesai</span>
                                 ${details ? `
-                                    <button onclick="showNotifDetail(event, null, null, '${mapId}')" 
-                                            class="text-[8px] font-black text-emerald-500 bg-emerald-50 px-1.5 py-0.5 rounded-full animate-pulse hover:bg-emerald-500 hover:text-white transition-all">
+                                    <button onclick="toggleInlineDetail(event, '${mapId}')" 
+                                            class="text-[8px] font-black text-emerald-500 bg-emerald-50 px-1.5 py-0.5 rounded-full animate-pulse hover:bg-emerald-500 hover:text-white transition-all shadow-sm ring-1 ring-emerald-100">
                                         DETAIL
                                     </button>` : ''}
                             </div>
                             <p class="text-[10px] font-bold text-emerald-600 mt-1 line-clamp-1">${header}</p>
                             <p class="text-[9px] text-gray-400 mt-1 font-bold uppercase">${time}</p>
+                            
+                            <!-- Inline Detail Card (Box) -->
+                            <div id="detail-box-${mapId}" class="hidden mt-3 p-3 bg-emerald-50/50 rounded-[1.2rem] border border-emerald-100/50 transition-all duration-300 overflow-hidden">
+                                <p class="text-[10px] font-black text-emerald-800 uppercase tracking-tighter mb-1.5 pb-1 border-b border-emerald-100">Rincian Perbaikan</p>
+                                <p class="text-[10px] text-gray-600 leading-relaxed font-medium">${details.replace(/\n/g, '<br>')}</p>
+                                <button onclick="showNotifDetail(null, null, null, '${mapId}')" class="mt-2.5 w-full py-1.5 bg-white border border-emerald-100 text-[#10b981] text-[8px] font-black uppercase rounded-lg hover:bg-emerald-50 transition-all">Lihat Mode Fokus</button>
+                            </div>
                         </div>
                     </div>
                     
