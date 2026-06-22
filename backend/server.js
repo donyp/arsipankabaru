@@ -82,6 +82,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'change-this-to-a-very-long-random-
 const JWT_EXPIRES_IN = '8h';
 
 // Maintenance Mode Helper (Persistent via Supabase + Fallback File)
+// Task 3.5: Improved async error handling with comprehensive logging
 const MAINTENANCE_FILE = path.join(__dirname, 'maintenance_status.json');
 async function getMaintenanceStatus() {
     try {
@@ -92,6 +93,17 @@ async function getMaintenanceStatus() {
             .eq('key', 'maintenance_mode')
             .maybeSingle();
 
+        if (error) {
+            // Task 3.5: Explicit error logging for Supabase query failures
+            console.warn('[Maintenance] Supabase query error:', {
+                message: error.message,
+                code: error.code,
+                details: error.details,
+                hint: error.hint
+            });
+            throw error; // Fall through to catch block for fallback handling
+        }
+
         if (data && data.value) {
             return typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
         }
@@ -100,11 +112,29 @@ async function getMaintenanceStatus() {
         if (!fs.existsSync(MAINTENANCE_FILE)) return { isMaintenance: false };
         return JSON.parse(fs.readFileSync(MAINTENANCE_FILE, 'utf8'));
     } catch (err) {
-        console.warn('[Maintenance] DB fetch failed, using local fallback:', err.message);
+        // Task 3.5: Enhanced error logging with stack trace
+        console.warn('[Maintenance] DB fetch failed, using local fallback:', {
+            message: err.message,
+            code: err.code,
+            stack: err.stack
+        });
+        
         try {
-            if (!fs.existsSync(MAINTENANCE_FILE)) return { isMaintenance: false };
-            return JSON.parse(fs.readFileSync(MAINTENANCE_FILE, 'utf8'));
-        } catch (_) {
+            if (!fs.existsSync(MAINTENANCE_FILE)) {
+                // Task 3.5: Log fallback to default value
+                console.warn('[Maintenance] No local file found, defaulting to maintenance=OFF');
+                return { isMaintenance: false };
+            }
+            const localData = JSON.parse(fs.readFileSync(MAINTENANCE_FILE, 'utf8'));
+            console.log('[Maintenance] Successfully loaded from local file:', localData);
+            return localData;
+        } catch (fileErr) {
+            // Task 3.5: Explicit logging when all fallbacks fail
+            console.error('[Maintenance] All maintenance status sources failed:', {
+                dbError: err.message,
+                fileError: fileErr.message
+            });
+            console.warn('[Maintenance] Defaulting to maintenance=OFF to prevent blocking requests');
             return { isMaintenance: false };
         }
     }
@@ -117,6 +147,7 @@ async function getMaintenanceStatus() {
 /**
  * Verify JWT token from Authorization header.
  * Populates req.user = { userId, email, role, zona_id }
+ * Task 3.5: Enhanced async middleware error handling to prevent event loop blocking
  */
 function authenticateToken(req, res, next) {
     const authHeader = req.headers['authorization'];
@@ -139,6 +170,7 @@ function authenticateToken(req, res, next) {
         req.user = decoded;
 
         // --- MAINTENANCE MODE ENFORCEMENT ---
+        // Task 3.5: Async call with comprehensive error handling to prevent blocking
         getMaintenanceStatus()
             .then(sys => {
                 if (sys && sys.isMaintenance && decoded.role === 'admin_zona') {
@@ -149,24 +181,48 @@ function authenticateToken(req, res, next) {
                 }
 
                 // Session Heartbeat (Asynchronous)
+                // Task 3.5: Fire-and-forget pattern with comprehensive error handling
                 const sessionId = req.headers['x-session-id'];
                 if (sessionId) {
                     supabase.from('active_sessions')
                         .update({ last_active: new Date().toISOString() })
                         .eq('session_id', sessionId)
                         .then(({ error }) => {
-                            if (error) console.warn('[HEARTBEAT] Error updating session:', error.message);
+                            if (error) {
+                                // Task 3.5: Detailed error logging
+                                console.warn('[HEARTBEAT] Error updating session:', {
+                                    sessionId,
+                                    message: error.message,
+                                    code: error.code
+                                });
+                            }
                         })
                         .catch(err => {
-                            console.warn('[HEARTBEAT] Failed to update session:', err.message);
+                            // Task 3.5: Catch any promise rejections to prevent blocking
+                            console.warn('[HEARTBEAT] Failed to update session:', {
+                                sessionId,
+                                message: err.message,
+                                stack: err.stack
+                            });
+                            // Note: Request continues regardless of heartbeat failure
                         });
                 }
 
+                // Task 3.5: Request continues regardless of async operation results
                 next();
             })
             .catch(err => {
-                console.error('[Maintenance Check Error]', err.message || err);
-                // Fallback: assume no maintenance mode on error to unblock requests
+                // Task 3.5: Enhanced error logging with context
+                console.error('[Middleware] Maintenance check async error:', {
+                    message: err.message || err,
+                    stack: err.stack,
+                    userId: decoded.userId,
+                    role: decoded.role,
+                    path: req.path
+                });
+                // Task 3.5: Fallback behavior - assume maintenance mode is OFF
+                // This ensures async failures never block request processing
+                console.warn('[Middleware] Continuing request processing with maintenance=OFF fallback');
                 next();
             });
     });
@@ -1737,8 +1793,20 @@ app.get('/api/broadcasts/latest', authenticateToken, async (req, res) => {
 });
 
 // GET /api/system/maintenance — Get current system status (Public)
+// Task 3.5: Added error handling to ensure async failures never block responses
 app.get('/api/system/maintenance', async (req, res) => {
-    res.json(await getMaintenanceStatus());
+    try {
+        const status = await getMaintenanceStatus();
+        res.json(status);
+    } catch (err) {
+        // Task 3.5: Log error and return safe fallback
+        console.error('[API] Error fetching maintenance status:', {
+            message: err.message,
+            stack: err.stack
+        });
+        // Return safe default to prevent endpoint failure
+        res.json({ isMaintenance: false, error: 'Unable to fetch maintenance status' });
+    }
 });
 
 // POST /api/system/sync-terabox — Sync Terabox files to database
@@ -1860,8 +1928,13 @@ app.post('/api/system/sync-terabox', authenticateToken, authorizeRole('super_adm
 
 // POST/PUT /api/system/maintenance — Toggle maintenance mode
 app.all('/api/system/maintenance', authenticateToken, authorizeRole('super_admin', 'moderator'), async (req, res) => {
-    if (req.method === 'GET') return res.json(await getMaintenanceStatus());
+    // Task 3.5: Moved GET method inside try-catch for error handling
     try {
+        if (req.method === 'GET') {
+            const status = await getMaintenanceStatus();
+            return res.json(status);
+        }
+        
         const isMaintenance = req.body.isMaintenance !== undefined ? req.body.isMaintenance : req.body.is_maintenance;
         const result = req.body.result;
 
@@ -3391,6 +3464,7 @@ app.delete('/api/fleet/:id', authenticateToken, async (req, res) => {
 // SERVER STARTUP WITH COMPREHENSIVE ERROR HANDLING
 // ============================================================
 
+// Task 3.4: Log startup intent before binding
 console.log(`🚀 Backend starting on port ${process.env.PORT || 4000}`);
 
 // CRITICAL: Listen on 0.0.0.0 for Docker/Hugging Face compatibility
@@ -3399,7 +3473,8 @@ console.log(`🚀 Backend starting on port ${process.env.PORT || 4000}`);
 const HOST = '0.0.0.0';
 
 const server = app.listen(port, HOST, () => {
-    console.log(`✅ Backend listening on ${HOST}:${port}`);
+    // Task 3.4: Log successful port binding
+    console.log(`✅ Backend listening on port ${port}`);
     console.log(`✅ External access: http://localhost:${port}`);
     console.log(`🚀 Pusat Arsip Anka Backend v2.1 running on http://localhost:${port}`);
     console.log(`   Auth: JWT (${JWT_EXPIRES_IN} expiry)`);
@@ -3410,39 +3485,66 @@ const server = app.listen(port, HOST, () => {
 // Task 3.1: Error handler for port binding failures
 server.on('error', (err) => {
     if (err.code === 'EADDRINUSE') {
-        console.error(`❌ Error binding to port ${port}: address already in use (EADDRINUSE)`);
-        console.error(`   Port ${port} is already in use by another process.`);
-        console.error(`   Solution: Stop the other process or use a different PORT.`);
+        console.error(`Error binding to port ${port}: address already in use`);
         process.exit(1);
     } else if (err.code === 'EACCES') {
-        console.error(`❌ Error binding to port ${port}: permission denied (EACCES)`);
-        console.error(`   Insufficient permissions to bind to port ${port}.`);
-        console.error(`   Solution: Use a port > 1024 or run with appropriate privileges.`);
+        console.error(`Error binding to port ${port}: permission denied`);
         process.exit(1);
     } else if (err.code === 'ENOTFOUND') {
-        console.error(`❌ Error binding to port ${port}: hostname not found (ENOTFOUND)`);
-        console.error(`   Cannot resolve the hostname/IP address.`);
+        console.error(`Error binding to port ${port}: ${err.message}`);
         process.exit(1);
     } else {
-        console.error(`❌ Error binding to port ${port}:`, err.message);
-        console.error(`   Stack trace:`, err.stack);
+        console.error(`Error binding to port ${port}: ${err.message}`);
         process.exit(1);
     }
 });
 
 // Task 3.2: Server object error event listener (catches errors after binding)
+// Handles client connection errors (invalid HTTP, connection resets, etc.)
 server.on('clientError', (err, socket) => {
     console.error('[Server] Client error detected:', err.message);
+    console.error('[Server] Error code:', err.code);
+    console.error('[Server] Stack trace:', err.stack);
+    
     if (err.code === 'ECONNRESET') {
-        console.warn('[Server] Connection reset by client');
-    } else if (err.code === 'HPE_INVALID_HEADER_TOKEN') {
-        console.warn('[Server] Invalid HTTP header from client');
+        console.warn('[Server] Connection reset by client - this is usually harmless');
+    } else if (err.code === 'HPE_INVALID_HEADER_TOKEN' || err.code === 'HPE_INVALID_METHOD' || err.code === 'HPE_INVALID_VERSION') {
+        console.warn('[Server] Invalid HTTP protocol from client');
+    } else if (err.code === 'ETIMEDOUT') {
+        console.warn('[Server] Client connection timed out');
     } else {
-        console.error('[Server] Unexpected client error:', err);
+        console.error('[Server] Unexpected client error - full details:', JSON.stringify(err, Object.getOwnPropertyNames(err)));
     }
-    if (socket.writable) {
+    
+    // Send 400 Bad Request if socket is still writable
+    if (socket && socket.writable && !socket.destroyed) {
         socket.end('HTTP/1.1 400 Bad Request\r\n\r\n');
     }
+});
+
+// Task 3.2: Handle TLS/SSL client errors if using HTTPS
+server.on('tlsClientError', (err, socket) => {
+    console.error('[Server] TLS/SSL client error:', err.message);
+    console.error('[Server] TLS error code:', err.code);
+    console.error('[Server] Stack trace:', err.stack);
+});
+
+// Task 3.2: Log when connections are established (useful for debugging)
+server.on('connection', (socket) => {
+    const remoteAddress = socket.remoteAddress;
+    const remotePort = socket.remotePort;
+    
+    // Only log connections in development/debug mode to avoid log spam
+    if (process.env.NODE_ENV === 'development' || process.env.DEBUG_CONNECTIONS === 'true') {
+        console.log(`[Server] New connection established from ${remoteAddress}:${remotePort}`);
+    }
+    
+    // Handle socket-level errors (always active regardless of environment)
+    socket.on('error', (err) => {
+        console.error(`[Server] Socket error from ${remoteAddress}:${remotePort}:`, err.message);
+        console.error('[Server] Socket error code:', err.code);
+        console.error('[Server] Stack trace:', err.stack);
+    });
 });
 
 // ============================================================

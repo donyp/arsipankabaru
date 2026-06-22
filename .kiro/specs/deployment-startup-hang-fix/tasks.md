@@ -83,7 +83,7 @@ The implementation targets 5 specific root causes identified in the design:
 
 ## Phase 1: Bug Condition Exploration
 
-- [ ] 1. Write bug condition exploration test
+- [x] 1. Write bug condition exploration test
   - **Property 1: Bug Condition** - Server Port Binding Failure Detection
   - **CRITICAL**: This test MUST FAIL on unfixed code - failure confirms the bug exists
   - **DO NOT attempt to fix the test or the code when it fails**
@@ -130,7 +130,7 @@ The implementation targets 5 specific root causes identified in the design:
 
 ## Phase 2: Preservation Property Tests
 
-- [ ] 2. Write preservation property tests (BEFORE implementing fix)
+- [x] 2. Write preservation property tests (BEFORE implementing fix)
   - **Property 2: Preservation** - Request Handling and Middleware Execution
   - **IMPORTANT**: Follow observation-first methodology - observe real behavior on unfixed code first
   
@@ -187,9 +187,9 @@ The implementation targets 5 specific root causes identified in the design:
 
 ## Phase 3: Implementation
 
-- [ ] 3. Fix deployment startup hang
+- [x] 3. Fix deployment startup hang
 
-  - [ ] 3.1 Implement error handling for port binding
+  - [x] 3.1 Implement error handling for port binding
     - Add error event handler to `app.listen()` call in backend/server.js
     - Catch EADDRINUSE errors (port already in use) and log: "Error binding to port {PORT}: address already in use"
     - Catch EACCES errors (permission denied) and log: "Error binding to port {PORT}: permission denied"
@@ -201,7 +201,7 @@ The implementation targets 5 specific root causes identified in the design:
     - _Preservation: All other startup logic remains unchanged_
     - _Requirements: 2.1, 2.2_
 
-  - [ ] 3.2 Add server object error event listener
+  - [x] 3.2 Add server object error event listener
     - Attach 'error' event handler to server object returned by `app.listen()`
     - Log all errors that occur on the server object with stack traces
     - Ensure uncaught socket errors or protocol errors are captured and logged
@@ -211,7 +211,7 @@ The implementation targets 5 specific root causes identified in the design:
     - _Preservation: Normal server operation is unchanged_
     - _Requirements: 2.1, 2.2_
 
-  - [ ] 3.3 Add process-level error handlers
+  - [x] 3.3 Add process-level error handlers
     - Add `process.on('uncaughtException')` handler that logs synchronous errors with full stack trace
     - Add `process.on('unhandledRejection')` handler that logs promise rejections with full details
     - Log source file, line number, and error message for debugging
@@ -222,7 +222,7 @@ The implementation targets 5 specific root causes identified in the design:
     - _Preservation: Error handling for request-level operations unchanged_
     - _Requirements: 2.1, 2.2_
 
-  - [ ] 3.4 Verify PORT environment variable configuration
+  - [x] 3.4 Verify PORT environment variable configuration
     - Confirm that `process.env.PORT` is correctly read from Dockerfile `ENV PORT=7860`
     - Add startup log statement: "🚀 Backend starting on port {process.env.PORT || 4000}"
     - Add log after successful binding: "✅ Backend listening on port {PORT}"
@@ -233,7 +233,7 @@ The implementation targets 5 specific root causes identified in the design:
     - _Preservation: Application works with hardcoded port values_
     - _Requirements: 2.1, 2.2_
 
-  - [ ] 3.5 Improve async middleware error handling
+  - [x] 3.5 Improve async middleware error handling
     - Review `getMaintenanceStatus()` async calls in `authenticateToken` middleware
     - Ensure `.catch()` handlers prevent promise rejections from blocking event loop
     - Add explicit error logging for async failures in middleware
@@ -248,7 +248,7 @@ The implementation targets 5 specific root causes identified in the design:
 
 ## Phase 4: Verification and Testing
 
-- [ ] 4. Verify bug condition exploration test now passes
+- [x] 4. Verify bug condition exploration test now passes
   - **Property 1: Expected Behavior** - Server Port Binding Succeeds After Fix
   - **IMPORTANT**: Re-run the SAME test from task 1 - do NOT write a new test
   - The test from task 1 encodes the expected behavior from the design
@@ -273,7 +273,7 @@ The implementation targets 5 specific root causes identified in the design:
   
   - _Requirements: 2.1, 2.2, 2.3_
 
-- [ ] 5. Verify preservation tests still pass
+- [x] 5. Verify preservation tests still pass
   - **Property 2: Preservation** - Request Handling Unchanged After Fix
   - **IMPORTANT**: Re-run the SAME tests from task 2 - do NOT write new tests
   - Run preservation property tests from step 2
@@ -298,7 +298,7 @@ The implementation targets 5 specific root causes identified in the design:
   
   - _Requirements: 3.1, 3.2, 3.3, 3.4_
 
-- [ ] 6. Checkpoint - All tests pass and deployment verified
+- [x] 6. Checkpoint - All tests pass and deployment verified
   - Verify all exploration and preservation tests pass ✓
   - Verify server starts and binds to port 7860 successfully ✓
   - Verify health check endpoint /api/heartbeat responds with 200 ✓
