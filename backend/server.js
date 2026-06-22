@@ -3276,8 +3276,14 @@ app.delete('/api/fleet/:id', authenticateToken, async (req, res) => {
 
 console.log(`🚀 Backend starting on port ${process.env.PORT || 4000}`);
 
-const server = app.listen(port, () => {
-    console.log(`✅ Backend listening on port ${port}`);
+// CRITICAL: Listen on 0.0.0.0 for Docker/Hugging Face compatibility
+// Listening on 'localhost' or '127.0.0.1' only works inside container
+// Must bind to 0.0.0.0 to be accessible from outside the container
+const HOST = '0.0.0.0';
+
+const server = app.listen(port, HOST, () => {
+    console.log(`✅ Backend listening on ${HOST}:${port}`);
+    console.log(`✅ External access: http://localhost:${port}`);
     console.log(`🚀 Pusat Arsip Anka Backend v2.1 running on http://localhost:${port}`);
     console.log(`   Auth: JWT (${JWT_EXPIRES_IN} expiry)`);
     console.log(`   Storage: Rclone (Terabox + Storj)`);

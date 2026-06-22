@@ -33,11 +33,10 @@ COPY *.md ./
 # Copy backend application
 COPY backend ./backend
 COPY start.sh ./
+COPY generate-rclone-config.js ./
 
-# Copy rclone.conf if it exists (optional for local storage)
-# Note: This file is in .gitignore, so it won't be in HF build
-# For rclone support, mount config at runtime or provide via secrets
-RUN touch /app/rclone.conf || true
+# Rclone config will be generated at runtime from environment variables
+# No need to copy rclone.conf (it's in .gitignore anyway)
 
 # Ensure scripts are executable
 RUN chmod +x /app/start.sh

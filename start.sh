@@ -20,6 +20,10 @@ export NODE_ENV=production
 echo "[INIT] PORT is set to: $PORT"
 echo "[INIT] NODE_ENV is set to: $NODE_ENV"
 
+# Generate rclone.conf from environment variables
+echo "[INIT] Generating rclone.conf from environment variables..."
+node /app/generate-rclone-config.js
+
 # Start Alist in background (optional, on port 5244)
 if command -v alist &> /dev/null; then
     echo "[INIT] Starting Alist service..."
