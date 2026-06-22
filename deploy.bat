@@ -37,7 +37,7 @@ if "!hf_username!"=="" (
     exit /b 1
 )
 
-set HF_SPACE_URL=https://huggingface.co/spaces/!hf_username!/pusat-arsip-anka
+set HF_SPACE_URL=https://huggingface.co/spaces/!hf_username!/e-arsipanka
 
 echo.
 echo Setting up Hugging Face remote...
