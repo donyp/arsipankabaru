@@ -710,12 +710,12 @@ app.get('/api/files/:id/view', authenticateToken, async (req, res) => {
 
         // Stream file via temp download with retry (rclone can be slow with WebDAV)
         let fileStream;
-        let retries = 3;
+        let retries = 5; // Increased from 3 to 5 attempts
         let lastError;
         
         while (retries > 0) {
             try {
-                console.log(`[Preview] Downloading file to temp: ${file.storage_path} (attempt ${4 - retries})`);
+                console.log(`[Preview] Downloading file to temp: ${file.storage_path} (attempt ${6 - retries})`);
                 const tempPath = await RcloneStorage.download(file.storage_path);
                 console.log(`[Preview] File ready at: ${tempPath}`);
                 fileStream = require('fs').createReadStream(tempPath);
@@ -733,7 +733,9 @@ app.get('/api/files/:id/view', authenticateToken, async (req, res) => {
                 retries--;
                 console.warn(`[Preview Download Error] Attempt failed, retries left: ${retries}`, downloadErr.message);
                 if (retries > 0) {
-                    await new Promise(r => setTimeout(r, 2000)); // Wait 2s before retry
+                    const delay = Math.min(5000 * (6 - retries), 20000); // 5s, 10s, 15s, 20s, 20s
+                    console.log(`[Preview] Waiting ${delay}ms before retry...`);
+                    await new Promise(r => setTimeout(r, delay));
                 }
             }
         }

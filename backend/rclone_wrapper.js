@@ -331,6 +331,7 @@ const RcloneStorage = {
 
     /**
      * Download a file from storage to temporary location
+     * Uses cat + file write for better control and timeout handling
      */
     async download(storagePath) {
         const tmpDir = path.join(__dirname, 'tmp');
@@ -341,11 +342,80 @@ const RcloneStorage = {
         
         logOperation('download', { 
             storagePath: storagePath,
-            tempPath: tempFilePath
+            tempPath: tempFilePath,
+            action: 'Starting download via rclone cat'
         });
 
-        await rcloneExec(['copy', remotePath, tmpDir]);
-        return tempFilePath;
+        return new Promise((resolve, reject) => {
+            // Use rclone cat with timeout handling
+            const child = spawn(rclonePath, ['--config', configPath, 'cat', remotePath, '--timeout=5m']);
+            const writeStream = fs.createWriteStream(tempFilePath);
+            
+            let timeoutHandle;
+            const timeout = 600000; // 10 minutes for large files
+            
+            // Set timeout
+            timeoutHandle = setTimeout(() => {
+                child.kill('SIGTERM');
+                writeStream.destroy();
+                fs.unlink(tempFilePath, () => {}); // Clean up
+                reject(new Error('Download timeout after 10 minutes'));
+            }, timeout);
+            
+            child.stdout.pipe(writeStream);
+            
+            child.on('error', (err) => {
+                clearTimeout(timeoutHandle);
+                writeStream.destroy();
+                fs.unlink(tempFilePath, () => {});
+                logOperation('download', { 
+                    status: '❌ Download spawn error',
+                    error: err.message,
+                    storagePath
+                });
+                reject(err);
+            });
+            
+            writeStream.on('error', (err) => {
+                clearTimeout(timeoutHandle);
+                child.kill('SIGTERM');
+                fs.unlink(tempFilePath, () => {});
+                logOperation('download', { 
+                    status: '❌ Download write error',
+                    error: err.message,
+                    storagePath
+                });
+                reject(err);
+            });
+            
+            writeStream.on('finish', () => {
+                clearTimeout(timeoutHandle);
+                
+                // Verify file was written
+                try {
+                    const stats = fs.statSync(tempFilePath);
+                    logOperation('download', { 
+                        status: '✅ Download successful',
+                        storagePath,
+                        fileSize: stats.size,
+                        tempPath: tempFilePath
+                    });
+                    resolve(tempFilePath);
+                } catch (err) {
+                    fs.unlink(tempFilePath, () => {});
+                    reject(new Error('Downloaded file not found or unreadable'));
+                }
+            });
+            
+            child.on('close', (code) => {
+                clearTimeout(timeoutHandle);
+                if (code !== 0) {
+                    writeStream.destroy();
+                    fs.unlink(tempFilePath, () => {});
+                    reject(new Error(`Rclone cat exited with code ${code}`));
+                }
+            });
+        });
     },
 
     /**

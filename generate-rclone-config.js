@@ -36,6 +36,9 @@ url = ${config.terabox_url}
 vendor = other
 user = ${config.terabox_user}
 pass = ${config.terabox_pass}
+read_timeout = 5m
+write_timeout = 5m
+idle_timeout = 5m
 
 [terabox_direct]
 type = webdav
@@ -43,6 +46,9 @@ url = ${config.terabox_direct_url}
 vendor = other
 user = ${config.terabox_direct_user}
 pass = ${config.terabox_direct_pass}
+read_timeout = 10m
+write_timeout = 10m
+idle_timeout = 10m
 
 [terabox_crypt]
 type = crypt
