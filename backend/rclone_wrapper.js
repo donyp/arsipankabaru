@@ -331,7 +331,7 @@ const RcloneStorage = {
 
     /**
      * Download a file from storage to temporary location
-     * Uses rclone copyto with better error handling
+     * First tries copyto, falls back to cat+pipe if copyto fails with "directory not found"
      */
     async download(storagePath) {
         const tmpDir = path.join(__dirname, 'tmp');
@@ -355,15 +355,50 @@ const RcloneStorage = {
             storagePath: storagePath,
             tempPath: tempFilePath,
             tmpDir: tmpDir,
-            action: 'Starting download via rclone copyto'
+            action: 'Starting download - trying copyto first'
         });
 
+        // Try method 1: copyto
+        try {
+            const result = await this._downloadViaCopyto(remotePath, tempFilePath, storagePath);
+            return result;
+        } catch (copytoErr) {
+            const errMsg = copytoErr.message || '';
+            if (errMsg.includes('directory not found') || errMsg.includes('not found')) {
+                console.log('[Download] copyto failed with "not found", trying cat streaming...');
+                logOperation('download', { 
+                    action: 'copyto failed, falling back to cat streaming',
+                    error: errMsg.substring(0, 200),
+                    storagePath
+                });
+                
+                // Try method 2: cat with streaming
+                try {
+                    const result = await this._downloadViaCat(remotePath, tempFilePath, storagePath);
+                    return result;
+                } catch (catErr) {
+                    logOperation('download', { 
+                        status: '❌ Download failed (all methods)',
+                        copytoError: copytoErr.message.substring(0, 100),
+                        catError: catErr.message.substring(0, 100),
+                        storagePath
+                    });
+                    throw new Error(`All download methods failed. copyto: ${copytoErr.message.substring(0, 100)}, cat: ${catErr.message.substring(0, 100)}`);
+                }
+            } else {
+                throw copytoErr;
+            }
+        }
+    },
+
+    /**
+     * Download via rclone copyto
+     */
+    async _downloadViaCopyto(remotePath, tempFilePath, storagePath) {
         return new Promise((resolve, reject) => {
-            // Use rclone copyto with verbose logging
             const args = [
                 '--config', configPath,
                 '--verbose',
-                '--progress',
                 '--timeout=10m',
                 '--retries=3',
                 'copyto',
@@ -373,33 +408,22 @@ const RcloneStorage = {
             
             const child = spawn(rclonePath, args);
             let stderr = '';
-            let stdout = '';
             
             const timeout = 600000; // 10 minutes
             let timeoutHandle = setTimeout(() => {
                 child.kill('SIGTERM');
                 fs.unlink(tempFilePath, () => {});
-                reject(new Error('Download timeout after 10 minutes'));
+                reject(new Error('Download copyto timeout after 10 minutes'));
             }, timeout);
             
             child.stderr.on('data', (data) => {
                 const msg = data.toString();
                 stderr += msg;
-                console.log('[Rclone stderr]', msg);
-            });
-            
-            child.stdout.on('data', (data) => {
-                stdout += data.toString();
             });
             
             child.on('error', (err) => {
                 clearTimeout(timeoutHandle);
                 fs.unlink(tempFilePath, () => {});
-                logOperation('download', { 
-                    status: '❌ Download spawn error',
-                    error: err.message,
-                    storagePath
-                });
                 reject(err);
             });
             
@@ -408,32 +432,26 @@ const RcloneStorage = {
                 
                 if (code !== 0) {
                     fs.unlink(tempFilePath, () => {});
-                    logOperation('download', { 
-                        status: '❌ Download failed',
-                        code: code,
-                        stderr: stderr.substring(0, 500),
-                        storagePath
-                    });
-                    reject(new Error(`Rclone copyto exited with code ${code}: ${stderr}`));
+                    reject(new Error(`Rclone copyto failed: ${stderr}`));
                     return;
                 }
                 
-                // Verify file exists and has content
+                // Verify file
                 try {
                     if (!fs.existsSync(tempFilePath)) {
-                        reject(new Error('Downloaded file does not exist after rclone copyto completed'));
+                        reject(new Error('Downloaded file does not exist'));
                         return;
                     }
                     
                     const stats = fs.statSync(tempFilePath);
                     if (stats.size === 0) {
                         fs.unlink(tempFilePath, () => {});
-                        reject(new Error('Downloaded file is empty (0 bytes)'));
+                        reject(new Error('Downloaded file is empty'));
                         return;
                     }
                     
                     logOperation('download', { 
-                        status: '✅ Download successful',
+                        status: '✅ Download successful (copyto)',
                         storagePath,
                         fileSize: stats.size,
                         tempPath: tempFilePath
@@ -441,9 +459,88 @@ const RcloneStorage = {
                     resolve(tempFilePath);
                 } catch (err) {
                     fs.unlink(tempFilePath, () => {});
-                    reject(new Error('Failed to verify downloaded file: ' + err.message));
+                    reject(err);
                 }
             });
+        });
+    },
+
+    /**
+     * Download via rclone cat + pipe to file
+     * More reliable for streaming from WebDAV
+     */
+    async _downloadViaCat(remotePath, tempFilePath, storagePath) {
+        return new Promise((resolve, reject) => {
+            const child = spawn(rclonePath, [
+                '--config', configPath,
+                '--timeout=10m',
+                'cat',
+                remotePath
+            ]);
+            
+            const writeStream = fs.createWriteStream(tempFilePath);
+            let stderr = '';
+            
+            const timeout = 600000; // 10 minutes
+            let timeoutHandle = setTimeout(() => {
+                child.kill('SIGTERM');
+                writeStream.destroy();
+                fs.unlink(tempFilePath, () => {});
+                reject(new Error('Download cat timeout after 10 minutes'));
+            }, timeout);
+            
+            child.stderr.on('data', (data) => {
+                stderr += data.toString();
+            });
+            
+            child.on('error', (err) => {
+                clearTimeout(timeoutHandle);
+                writeStream.destroy();
+                fs.unlink(tempFilePath, () => {});
+                reject(err);
+            });
+            
+            writeStream.on('error', (err) => {
+                clearTimeout(timeoutHandle);
+                child.kill('SIGTERM');
+                fs.unlink(tempFilePath, () => {});
+                reject(err);
+            });
+            
+            writeStream.on('finish', () => {
+                clearTimeout(timeoutHandle);
+                try {
+                    const stats = fs.statSync(tempFilePath);
+                    if (stats.size === 0) {
+                        fs.unlink(tempFilePath, () => {});
+                        reject(new Error('Downloaded file is empty'));
+                        return;
+                    }
+                    
+                    logOperation('download', { 
+                        status: '✅ Download successful (cat)',
+                        storagePath,
+                        fileSize: stats.size,
+                        tempPath: tempFilePath
+                    });
+                    resolve(tempFilePath);
+                } catch (err) {
+                    fs.unlink(tempFilePath, () => {});
+                    reject(err);
+                }
+            });
+            
+            child.on('close', (code) => {
+                clearTimeout(timeoutHandle);
+                if (code !== 0 && !writeStream.destroyed) {
+                    writeStream.destroy();
+                    fs.unlink(tempFilePath, () => {});
+                    reject(new Error(`Rclone cat exited with code ${code}: ${stderr}`));
+                }
+            });
+            
+            // Pipe cat output to file
+            child.stdout.pipe(writeStream);
         });
     },
 
