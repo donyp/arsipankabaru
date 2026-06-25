@@ -515,19 +515,27 @@ app.get('/api/auth/me', authenticateToken, async (req, res) => {
 // GET /api/files â€” list files (auto-filtered by zona for admin_zona)
 app.get('/api/files', authenticateToken, authorizeZone, async (req, res) => {
     try {
+        console.log(`[/api/files] User role: ${req.user.role}, zona_id: ${req.user.zona_id}`);
+        
         let query = supabase
             .from('files')
             .select('*, zonas(kode, nama), toko(kode, nama)', { count: 'exact' })
             .is('deleted_at', null)
             .order('created_at', { ascending: false });
 
-        // Auto-filter by zona for admin_zona
+        // Auto-filter by zona for admin_zona (INVOICE only)
         if (req.user.role === 'admin_zona') {
+            console.log(`[/api/files] Filtering as admin_zona for zona_id: ${req.user.zona_id}`);
             query = query.eq('zona_id', req.user.zona_id)
                 .eq('category', 'INVOICE'); // Strict: admin_zona only sees INVOICE category
-        } else if (req.query.zona_id) {
-            // Super admin can filter optionally
+        } 
+        // Moderator and super_admin see all files (no automatic zona filter)
+        // But can optionally filter by zona_id query param
+        else if (req.query.zona_id) {
+            console.log(`[/api/files] Filtering by optional zona_id: ${req.query.zona_id}`);
             query = query.eq('zona_id', parseInt(req.query.zona_id));
+        } else if (req.user.role === 'moderator' || req.user.role === 'super_admin') {
+            console.log(`[/api/files] ${req.user.role} viewing ALL files (no zona filter)`);
         }
 
         // Category filter
@@ -575,7 +583,12 @@ app.get('/api/files', authenticateToken, authorizeZone, async (req, res) => {
         query = query.range(from, to);
 
         const { data, error, count } = await query;
-        if (error) throw error;
+        if (error) {
+            console.error('[/api/files] Query error:', error);
+            throw error;
+        }
+
+        console.log(`[/api/files] Success: found ${data?.length || 0} files, total: ${count || 0}`);
 
         res.json({
             files: data || [],
