@@ -1,185 +1,255 @@
 #!/usr/bin/env node
 
 /**
- * Sync Terabox Files to Supabase Database
+ * Sync Terabox Files to Database
  * 
- * This script scans all files in Terabox storage and creates database records
- * for files that exist in Terabox but not in database.
+ * This script scans all files in Terabox via Rclone and inserts them into Supabase database.
+ * Use this to restore database after migration or to import existing Terabox files.
  * 
- * Usage: node sync-terabox-to-db.js
+ * Usage:
+ *   node backend/sync-terabox-to-db.js
+ * 
+ * Environment variables required:
+ *   - SUPABASE_URL
+ *   - SUPABASE_SERVICE_ROLE_KEY
  */
 
-require('dotenv').config();
+require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 const { createClient } = require('@supabase/supabase-js');
-const RcloneStorage = require('./rclone_wrapper');
+const { execFile } = require('child_process');
+const path = require('path');
 
+// Initialize Supabase client
 const supabase = createClient(
     process.env.SUPABASE_URL,
     process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-async function syncTeraboxToDatabase() {
-    console.log('='.repeat(60));
-    console.log('SYNC TERABOX FILES TO DATABASE');
-    console.log('='.repeat(60));
-    console.log();
+/**
+ * List all files from Terabox using rclone
+ */
+async function listTeraboxFiles() {
+    return new Promise((resolve, reject) => {
+        const configPath = path.join(__dirname, '..', 'rclone.conf');
+        
+        console.log('[Sync] Scanning Terabox files via rclone...');
+        console.log(`[Sync] Config: ${configPath}`);
+        
+        execFile('rclone', [
+            '--config', configPath,
+            'lsjson',
+            'terabox_direct:/',
+            '--recursive'
+        ], { maxBuffer: 50 * 1024 * 1024 }, (error, stdout, stderr) => {
+            if (error) {
+                console.error('[Sync] ❌ Failed to list Terabox files');
+                console.error('[Sync] Error:', error.message);
+                console.error('[Sync] Stderr:', stderr);
+                return reject(error);
+            }
+            
+            try {
+                const files = JSON.parse(stdout);
+                console.log(`[Sync] ✅ Found ${files.length} files in Terabox`);
+                resolve(files);
+            } catch (err) {
+                console.error('[Sync] ❌ Failed to parse rclone output');
+                reject(err);
+            }
+        });
+    });
+}
 
+/**
+ * Extract metadata from filename
+ * Expected format: zona{N}_{filename}
+ */
+function extractMetadata(filePath) {
+    const fileName = path.basename(filePath);
+    const match = fileName.match(/^zona(\d+[AB]?)_(.+)$/i);
+    
+    if (match) {
+        return {
+            zona: match[1].toUpperCase(),
+            originalName: match[2]
+        };
+    }
+    
+    // If no zona prefix, return defaults
+    return {
+        zona: null,
+        originalName: fileName
+    };
+}
+
+/**
+ * Get or create default admin user
+ */
+async function getAdminUser() {
+    // Try to find existing admin user
+    const { data: users, error } = await supabase
+        .from('users')
+        .select('id')
+        .eq('role', 'admin')
+        .limit(1);
+    
+    if (error) {
+        console.error('[Sync] ❌ Failed to query users:', error.message);
+        throw error;
+    }
+    
+    if (users && users.length > 0) {
+        console.log(`[Sync] Using existing admin user: ${users[0].id}`);
+        return users[0].id;
+    }
+    
+    // Create default admin user if none exists
+    console.log('[Sync] Creating default admin user...');
+    const { data: newUser, error: createError } = await supabase
+        .from('users')
+        .insert({
+            username: 'admin',
+            password_hash: '$2a$10$dummyhashforsynconlypurpose', // Placeholder
+            role: 'admin'
+        })
+        .select()
+        .single();
+    
+    if (createError) {
+        console.error('[Sync] ❌ Failed to create admin user:', createError.message);
+        throw createError;
+    }
+    
+    console.log(`[Sync] ✅ Created admin user: ${newUser.id}`);
+    return newUser.id;
+}
+
+/**
+ * Insert file into database
+ */
+async function insertFile(file, userId) {
+    const metadata = extractMetadata(file.Path);
+    
+    const fileRecord = {
+        user_id: userId,
+        file_name: metadata.originalName,
+        file_path: file.Path,
+        file_size: file.Size,
+        mime_type: file.MimeType || 'application/octet-stream',
+        zona_id: metadata.zona,
+        storage_location: 'terabox',
+        uploaded_at: file.ModTime || new Date().toISOString(),
+        is_active: true
+    };
+    
+    const { data, error } = await supabase
+        .from('media')
+        .insert(fileRecord)
+        .select()
+        .single();
+    
+    if (error) {
+        // Check if duplicate
+        if (error.code === '23505') {
+            console.log(`[Sync] ⚠️  Skipped duplicate: ${file.Path}`);
+            return { skipped: true };
+        }
+        
+        console.error(`[Sync] ❌ Failed to insert: ${file.Path}`);
+        console.error('[Sync] Error:', error.message);
+        return { error };
+    }
+    
+    return { success: true, data };
+}
+
+/**
+ * Main sync function
+ */
+async function syncFiles() {
+    console.log('================================================');
+    console.log('[Sync] 🔄 Terabox to Database Sync');
+    console.log('[Sync] Time:', new Date().toISOString());
+    console.log('================================================\n');
+    
     try {
-        // 1. Get all zones from database
-        console.log('[1/4] Fetching zones from database...');
-        const { data: zones, error: zonesError } = await supabase
-            .from('zonas')
-            .select('id, kode, nama');
+        // Step 1: Get admin user
+        console.log('[Step 1] Getting admin user...');
+        const userId = await getAdminUser();
+        console.log('[Step 1] ✅ Complete\n');
         
-        if (zonesError) throw zonesError;
-        console.log(`✅ Found ${zones.length} zones in database`);
-        console.log();
-
-        // 2. Get all tokos from database
-        console.log('[2/4] Fetching tokos from database...');
-        const { data: tokos, error: tokosError } = await supabase
-            .from('toko')
-            .select('id, kode, nama, zona_id');
+        // Step 2: List Terabox files
+        console.log('[Step 2] Listing Terabox files...');
+        const files = await listTeraboxFiles();
         
-        if (tokosError) throw tokosError;
-        console.log(`✅ Found ${tokos.length} tokos in database`);
-        console.log();
-
-        // 3. Scan Terabox storage structure
-        console.log('[3/4] Scanning Terabox storage...');
-        const baseStoragePath = '/arsip';
+        // Filter out directories (only files)
+        const fileList = files.filter(f => !f.IsDir);
+        console.log(`[Step 2] Found ${fileList.length} files (${files.length - fileList.length} directories skipped)`);
+        console.log('[Step 2] ✅ Complete\n');
         
-        let totalFilesFound = 0;
-        let totalFilesImported = 0;
-        let totalFilesSkipped = 0;
-
-        for (const zona of zones) {
-            console.log(`\n📁 Scanning zona: ${zona.kode} (${zona.nama})`);
+        if (fileList.length === 0) {
+            console.log('[Sync] ⚠️  No files found in Terabox');
+            console.log('[Sync] Complete with 0 files synced');
+            return;
+        }
+        
+        // Step 3: Insert files into database
+        console.log('[Step 3] Inserting files into database...');
+        let inserted = 0;
+        let skipped = 0;
+        let failed = 0;
+        
+        for (const file of fileList) {
+            const result = await insertFile(file, userId);
             
-            const zonaTokos = tokos.filter(t => t.zona_id === zona.id);
-            
-            for (const toko of zonaTokos) {
-                console.log(`  📁 Scanning toko: ${toko.kode} (${toko.nama})`);
-                
-                // Common categories
-                const categories = ['PPN', 'PPH', 'INVOICE', 'FAKTUR', 'BUKTI_BAYAR', 'LAINNYA'];
-                
-                for (const category of categories) {
-                    try {
-                        const storagePath = `${baseStoragePath}/${zona.kode}/${toko.kode}/${category}`;
-                        console.log(`    📂 Checking: ${storagePath}`);
-                        
-                        // List files in this category
-                        const files = await RcloneStorage.listFiles(storagePath);
-                        
-                        if (files.length === 0) {
-                            console.log(`      ℹ️  No files found`);
-                            continue;
-                        }
-                        
-                        console.log(`      ✅ Found ${files.length} files`);
-                        totalFilesFound += files.length;
-                        
-                        // Check each file
-                        for (const file of files) {
-                            if (file.is_dir) continue; // Skip directories
-                            
-                            const fileName = file.name;
-                            const fileStoragePath = `${storagePath}/${fileName}`;
-                            
-                            // Check if file already exists in database
-                            const { data: existingFile } = await supabase
-                                .from('files')
-                                .select('id')
-                                .eq('storage_path', fileStoragePath)
-                                .maybeSingle();
-                            
-                            if (existingFile) {
-                                console.log(`      ⏭️  Skip (exists): ${fileName}`);
-                                totalFilesSkipped++;
-                                continue;
-                            }
-                            
-                            // Create database record
-                            const fileRecord = {
-                                name: fileName,
-                                original_name: fileName,
-                                zona_id: zona.id,
-                                toko_id: toko.id,
-                                category: category,
-                                storage_path: fileStoragePath,
-                                size: file.size || 0,
-                                mime_type: 'application/pdf', // Assume PDF
-                                status: 'Unread',
-                                uploaded_by: 1, // Default to admin (ID: 1)
-                                uploaded_at: file.modified || new Date().toISOString(),
-                                is_archived: false,
-                                deleted_at: null
-                            };
-                            
-                            const { error: insertError } = await supabase
-                                .from('files')
-                                .insert(fileRecord);
-                            
-                            if (insertError) {
-                                console.log(`      ❌ Error importing ${fileName}: ${insertError.message}`);
-                            } else {
-                                console.log(`      ✅ Imported: ${fileName}`);
-                                totalFilesImported++;
-                            }
-                        }
-                    } catch (err) {
-                        if (err.message.includes('not found') || err.message.includes('404')) {
-                            // Category folder doesn't exist, skip
-                            console.log(`      ℹ️  Category not found: ${category}`);
-                        } else {
-                            console.error(`      ❌ Error scanning ${category}:`, err.message);
-                        }
-                    }
+            if (result.success) {
+                inserted++;
+                if (inserted % 10 === 0) {
+                    console.log(`[Sync] Progress: ${inserted}/${fileList.length} inserted...`);
                 }
+            } else if (result.skipped) {
+                skipped++;
+            } else {
+                failed++;
             }
         }
-
-        console.log();
-        console.log('='.repeat(60));
-        console.log('[4/4] SYNC COMPLETE');
-        console.log('='.repeat(60));
-        console.log(`📊 Total files found in Terabox: ${totalFilesFound}`);
-        console.log(`✅ Total files imported to database: ${totalFilesImported}`);
-        console.log(`⏭️  Total files skipped (already exist): ${totalFilesSkipped}`);
-        console.log();
         
-        if (totalFilesImported > 0) {
-            console.log('✅ Success! Files are now visible in the dashboard.');
-        } else if (totalFilesSkipped > 0) {
-            console.log('ℹ️  All files already exist in database. No import needed.');
-        } else {
-            console.log('⚠️  No files found to import. Check Terabox storage structure.');
+        console.log('[Step 3] ✅ Complete\n');
+        
+        // Summary
+        console.log('================================================');
+        console.log('[Sync] ✅ SYNC COMPLETE');
+        console.log('================================================');
+        console.log(`Total files in Terabox: ${fileList.length}`);
+        console.log(`✅ Inserted: ${inserted}`);
+        console.log(`⚠️  Skipped (duplicates): ${skipped}`);
+        console.log(`❌ Failed: ${failed}`);
+        console.log('================================================\n');
+        
+        if (failed > 0) {
+            console.log('⚠️  Some files failed to sync. Check logs above for details.');
+            process.exit(1);
         }
         
     } catch (err) {
-        console.error();
-        console.error('❌ SYNC FAILED');
-        console.error('='.repeat(60));
-        console.error('Error:', err.message);
-        console.error();
-        console.error('Possible causes:');
-        console.error('1. Supabase connection failed');
-        console.error('2. Rclone/Alist not configured correctly');
-        console.error('3. Storage path structure mismatch');
-        console.error('4. Missing zones or tokos in database');
-        console.error();
+        console.error('\n[Sync] ❌ SYNC FAILED');
+        console.error('[Sync] Error:', err.message);
+        console.error('[Sync] Stack:', err.stack);
         process.exit(1);
     }
 }
 
-// Run the sync
-syncTeraboxToDatabase()
-    .then(() => {
-        console.log('✅ Sync completed successfully');
-        process.exit(0);
-    })
-    .catch(err => {
-        console.error('❌ Sync failed:', err);
-        process.exit(1);
-    });
+// Run sync
+if (require.main === module) {
+    syncFiles()
+        .then(() => {
+            console.log('[Sync] Exiting...');
+            process.exit(0);
+        })
+        .catch(err => {
+            console.error('[Sync] Fatal error:', err);
+            process.exit(1);
+        });
+}
+
+module.exports = { syncFiles, listTeraboxFiles };

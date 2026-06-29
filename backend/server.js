@@ -1,5 +1,5 @@
-﻿// ============================================================
-// Pusat Arsip Anka Backend — JWT Auth + Rclone Storage
+// ============================================================
+// Pusat Arsip Anka Backend � JWT Auth + Rclone Storage
 // ============================================================
 const express = require('express');
 const cors = require('cors');
@@ -36,9 +36,9 @@ console.log('================================================');
 console.log('[CONFIG] Reading environment variables...');
 console.log(`[CONFIG] PORT: ${process.env.PORT || 'default 4000'}`);
 console.log(`[CONFIG] NODE_ENV: ${process.env.NODE_ENV || 'not set'}`);
-console.log(`[CONFIG] SUPABASE_URL: ${process.env.SUPABASE_URL ? 'SET (' + process.env.SUPABASE_URL.substring(0, 20) + '...)' : '❌ NOT SET'}`);
-console.log(`[CONFIG] SUPABASE_SERVICE_ROLE_KEY: ${process.env.SUPABASE_SERVICE_ROLE_KEY ? 'SET (' + process.env.SUPABASE_SERVICE_ROLE_KEY.substring(0, 20) + '...)' : '❌ NOT SET'}`);
-console.log(`[CONFIG] JWT_SECRET: ${process.env.JWT_SECRET ? 'SET (' + process.env.JWT_SECRET.substring(0, 20) + '...)' : '❌ NOT SET'}`);
+console.log(`[CONFIG] SUPABASE_URL: ${process.env.SUPABASE_URL ? 'SET (' + process.env.SUPABASE_URL.substring(0, 20) + '...)' : '? NOT SET'}`);
+console.log(`[CONFIG] SUPABASE_SERVICE_ROLE_KEY: ${process.env.SUPABASE_SERVICE_ROLE_KEY ? 'SET (' + process.env.SUPABASE_SERVICE_ROLE_KEY.substring(0, 20) + '...)' : '? NOT SET'}`);
+console.log(`[CONFIG] JWT_SECRET: ${process.env.JWT_SECRET ? 'SET (' + process.env.JWT_SECRET.substring(0, 20) + '...)' : '? NOT SET'}`);
 console.log('[CONFIG] Environment configuration loaded.\n');
 
 app.use(cors());
@@ -263,7 +263,7 @@ function authenticateToken(req, res, next) {
 }
 
 /**
- * RBAC Middleware â€” restrict routes to specific roles.
+ * RBAC Middleware — restrict routes to specific roles.
  */
 function authorizeRole(...allowedRoles) {
     return (req, res, next) => {
@@ -471,7 +471,7 @@ app.post('/api/auth/login', async (req, res) => {
     }
 });
 
-// POST /api/auth/verify-admin — quick check for admin bypass during maintenance
+// POST /api/auth/verify-admin � quick check for admin bypass during maintenance
 app.post('/api/auth/verify-admin', async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -496,7 +496,7 @@ app.post('/api/auth/verify-admin', async (req, res) => {
     }
 });
 
-// POST /api/auth/logout (stateless â€” just for audit logging)
+// POST /api/auth/logout (stateless — just for audit logging)
 app.post('/api/auth/logout', authenticateToken, async (req, res) => {
     await supabase.from('audit_logs').insert({
         user_id: req.user.userId,
@@ -506,7 +506,7 @@ app.post('/api/auth/logout', authenticateToken, async (req, res) => {
     res.json({ success: true, message: 'Logged out.' });
 });
 
-// GET /api/auth/me â€” get current user info
+// GET /api/auth/me — get current user info
 app.get('/api/auth/me', authenticateToken, async (req, res) => {
     try {
         const { data: user, error } = await supabase
@@ -521,7 +521,7 @@ app.get('/api/auth/me', authenticateToken, async (req, res) => {
 
         res.json({ user });
 
-        // POST /api/logout â€” Terminate session
+        // POST /api/logout — Terminate session
         app.post('/api/logout', authenticateToken, async (req, res) => {
             try {
                 const { session_id } = req.body;
@@ -542,7 +542,7 @@ app.get('/api/auth/me', authenticateToken, async (req, res) => {
 // FILES ENDPOINTS
 // ============================================================
 
-// GET /api/files â€” list files (auto-filtered by zona for admin_zona)
+// GET /api/files — list files (auto-filtered by zona for admin_zona)
 app.get('/api/files', authenticateToken, authorizeZone, async (req, res) => {
     try {
         console.log(`[/api/files] User role: ${req.user.role}, zona_id: ${req.user.zona_id}`);
@@ -638,7 +638,7 @@ app.get('/api/files', authenticateToken, authorizeZone, async (req, res) => {
     }
 });
 
-// GET /api/files/trash — list deleted files
+// GET /api/files/trash � list deleted files
 app.get('/api/files/trash', authenticateToken, requirePermission('restore_trash'), async (req, res) => {
     try {
         let query = supabase
@@ -688,7 +688,7 @@ app.get('/api/files/trash', authenticateToken, requirePermission('restore_trash'
 });
 
 
-// GET /api/toko — list tokos (filtered by zona)
+// GET /api/toko � list tokos (filtered by zona)
 app.get('/api/toko', authenticateToken, async (req, res) => {
     try {
         let query = supabase.from('toko').select('id, kode, nama, zona_id').order('nama', { ascending: true });
@@ -712,7 +712,7 @@ app.get('/api/toko', authenticateToken, async (req, res) => {
     }
 });
 
-// GET /api/files/:id/view â€” return file for PDF.js viewer
+// GET /api/files/:id/view — return file for PDF.js viewer
 app.get('/api/files/:id/view', authenticateToken, async (req, res) => {
     try {
         const { data: file, error } = await supabase
@@ -779,7 +779,7 @@ app.get('/api/files/:id/view', authenticateToken, async (req, res) => {
     }
 });
 
-// GET /api/files/:id/download â€” download file
+// GET /api/files/:id/download — download file
 app.get('/api/files/:id/download', authenticateToken, async (req, res) => {
     try {
         const { data: file, error } = await supabase
@@ -838,7 +838,7 @@ app.get('/api/files/download/:id', authenticateToken, (req, res) => {
     res.redirect(`/api/files/${req.params.id}/download?token=${req.query.token}`);
 });
 
-// GET /api/files/:id/view — inline preview (PDF in iframe)
+// GET /api/files/:id/view � inline preview (PDF in iframe)
 app.get('/api/files/:id/view', authenticateToken, async (req, res) => {
     try {
         const { data: file, error } = await supabase
@@ -1031,7 +1031,7 @@ app.get('/api/share/:token', async (req, res) => {
     }
 });
 
-// GET /api/files/check-duplicate — Background check for filename existence
+// GET /api/files/check-duplicate � Background check for filename existence
 app.get('/api/files/check-duplicate', authenticateToken, async (req, res) => {
     try {
         const { name, zona_id } = req.query;
@@ -1230,7 +1230,7 @@ app.post('/api/files/upload', authenticateToken, requireUploadPermission, upload
 
             if (anomalyFiles && anomalyFiles.length > 0) {
                 finalStatus = 'Unread (Anomali)';
-                console.warn(`⚠️ [FRAUD DETECTION] Anomaly detected! Duplicate nominal Rp${finalNominal} for Toko ID ${toko_id} within 24h.`);
+                console.warn(`?? [FRAUD DETECTION] Anomaly detected! Duplicate nominal Rp${finalNominal} for Toko ID ${toko_id} within 24h.`);
             }
         }
 
@@ -1324,7 +1324,7 @@ app.post('/api/files/upload', authenticateToken, requireUploadPermission, upload
             context: `Uploaded ${req.file.originalname} to ${storagePath}`
         });
 
-        // [DISABLED] WA Notification — replaced by manual copy-paste system via /api/batches
+        // [DISABLED] WA Notification � replaced by manual copy-paste system via /api/batches
 
         res.json({
             success: true,
@@ -1534,7 +1534,7 @@ app.post('/api/files/bulk-trash-delete', authenticateToken, requirePermission('h
     }
 });
 
-// PUT /api/files/:id/restore — Restricted to Admin/Moderator
+// PUT /api/files/:id/restore � Restricted to Admin/Moderator
 app.put('/api/files/:id/restore', authenticateToken, authorizeRole('super_admin', 'moderator'), async (req, res) => {
     try {
 
@@ -1681,7 +1681,7 @@ app.get('/api/users', authenticateToken, requirePermission('manage_users'), asyn
     }
 });
 
-// POST /api/users â€” create user
+// POST /api/users — create user
 app.post('/api/users', authenticateToken, requirePermission('manage_users'), async (req, res) => {
     try {
         const { email, contact_email, password, name, role, zona_id, toko_id, permissions } = req.body;
@@ -1731,7 +1731,7 @@ app.post('/api/users', authenticateToken, requirePermission('manage_users'), asy
     }
 });
 
-// PUT /api/users/:id â€” update user
+// PUT /api/users/:id — update user
 app.put('/api/users/:id', authenticateToken, requirePermission('manage_users'), async (req, res) => {
     try {
         const { email, contact_email, password, name, role, zona_id, toko_id, is_active, permissions } = req.body;
@@ -1773,7 +1773,7 @@ app.put('/api/users/:id', authenticateToken, requirePermission('manage_users'), 
     }
 });
 
-// DELETE /api/users/:id â€” Permanent Delete
+// DELETE /api/users/:id — Permanent Delete
 app.delete('/api/users/:id', authenticateToken, requirePermission('manage_users'), async (req, res) => {
     try {
         const userIdToDelete = req.params.id;
@@ -1807,7 +1807,7 @@ app.delete('/api/users/:id', authenticateToken, requirePermission('manage_users'
 // OPERATIONAL FEATURES (Broadcast & Stats)
 // ============================================================
 
-// POST /api/broadcasts — Send broadcast (Admin only)
+// POST /api/broadcasts � Send broadcast (Admin only)
 app.post('/api/broadcasts', authenticateToken, authorizeRole('super_admin', 'moderator'), async (req, res) => {
     try {
         const { content, target_zona_id } = req.body;
@@ -1831,7 +1831,7 @@ app.post('/api/broadcasts', authenticateToken, authorizeRole('super_admin', 'mod
     }
 });
 
-// GET /api/broadcasts — Fetch all broadcasts
+// GET /api/broadcasts � Fetch all broadcasts
 app.get('/api/broadcasts', authenticateToken, authorizeRole('super_admin', 'moderator'), async (req, res) => {
     try {
         const { data, error } = await supabase
@@ -1847,7 +1847,7 @@ app.get('/api/broadcasts', authenticateToken, authorizeRole('super_admin', 'mode
 });
 
 
-// DELETE /api/broadcasts/:id — Delete broadcast
+// DELETE /api/broadcasts/:id � Delete broadcast
 app.delete('/api/broadcasts/:id', authenticateToken, authorizeRole('super_admin', 'moderator'), async (req, res) => {
     try {
         const { error } = await supabase
@@ -1885,7 +1885,7 @@ app.get('/api/broadcasts/latest', authenticateToken, async (req, res) => {
     }
 });
 
-// GET /api/system/maintenance — Get current system status (Public)
+// GET /api/system/maintenance � Get current system status (Public)
 // Task 3.5: Added error handling to ensure async failures never block responses
 app.get('/api/system/maintenance', async (req, res) => {
     try {
@@ -1902,7 +1902,7 @@ app.get('/api/system/maintenance', async (req, res) => {
     }
 });
 
-// POST /api/system/sync-terabox — Sync Terabox files to database
+// POST /api/system/sync-terabox � Sync Terabox files to database
 app.post('/api/system/sync-terabox', authenticateToken, authorizeRole('super_admin', 'moderator'), async (req, res) => {
     try {
         console.log('[Sync] Starting Terabox to Database sync...');
@@ -2019,7 +2019,7 @@ app.post('/api/system/sync-terabox', authenticateToken, authorizeRole('super_adm
     }
 });
 
-// POST/PUT /api/system/maintenance — Toggle maintenance mode
+// POST/PUT /api/system/maintenance � Toggle maintenance mode
 app.all('/api/system/maintenance', authenticateToken, authorizeRole('super_admin', 'moderator'), async (req, res) => {
     // Task 3.5: Moved GET method inside try-catch for error handling
     try {
@@ -2069,7 +2069,7 @@ app.all('/api/system/maintenance', authenticateToken, authorizeRole('super_admin
 
         // Notification: Maintenance status change
         if (!isMaintenance && result) {
-            createSystemNotification({ title: '✅ Perbaikan Selesai', message: 'Sistem kembali online: ' + (result.title || 'Selesai') + (result.details ? ' — ' + result.details : ''), type: 'success' });
+            createSystemNotification({ title: '? Perbaikan Selesai', message: 'Sistem kembali online: ' + (result.title || 'Selesai') + (result.details ? ' � ' + result.details : ''), type: 'success' });
         }
 
         res.json({ success: true, status });
@@ -2093,7 +2093,7 @@ app.get('/api/debug/fix-sizes', async (req, res) => {
     }
 });
 
-// GET /api/stats/storage — storage usage statistics
+// GET /api/stats/storage � storage usage statistics
 app.get('/api/stats/storage', authenticateToken, async (req, res) => {
     try {
         console.log('[STATS] Fetching storage stats for user:', req.user.userId);
@@ -2152,14 +2152,14 @@ app.get('/api/stats/storage', authenticateToken, async (req, res) => {
     }
 });
 
-// GET /api/stats/chart — Invoice Analytics (Zone-Aware)
+// GET /api/stats/chart � Invoice Analytics (Zone-Aware)
 app.get('/api/stats/chart', authenticateToken, async (req, res) => {
     try {
         const chartData = {};
         const isZoneAdmin = req.user.role === 'admin_zona';
         const userZonaId = req.user.zona_id;
 
-        // 1. Fetch zones — admin_zona only gets their own zone
+        // 1. Fetch zones � admin_zona only gets their own zone
         let zonaQuery = supabase.from('zonas').select('id, nama').order('kode');
         if (isZoneAdmin && userZonaId) {
             zonaQuery = zonaQuery.eq('id', userZonaId);
@@ -2171,7 +2171,7 @@ app.get('/api/stats/chart', authenticateToken, async (req, res) => {
             }
         }
 
-        // 2. Fetch INVOICE files — filtered by zone for admin_zona
+        // 2. Fetch INVOICE files � filtered by zone for admin_zona
         let fileQuery = supabase
             .from('files')
             .select('total_jual, category, nama_file, zona_id, zonas(nama)')
@@ -2252,7 +2252,7 @@ app.get('/api/admin/login-history', authenticateToken, requirePermission('view_a
     }
 });
 
-// POST /api/files/:id/dispute — Admin Zona flags invoice as incorrect (Revision Request)
+// POST /api/files/:id/dispute � Admin Zona flags invoice as incorrect (Revision Request)
 app.post('/api/files/:id/dispute', authenticateToken, async (req, res) => {
     try {
         const { reason, note } = req.body;
@@ -2305,7 +2305,7 @@ app.post('/api/files/:id/dispute', authenticateToken, async (req, res) => {
         // 5. Notify Moderators
         await createNotification({
             role: 'moderator',
-            title: '📣 Request Revisi Baru',
+            title: '?? Request Revisi Baru',
             message: `Zona ${req.user.zona_id || '-'} meminta revisi berkas: ${file.nama_file}`,
             type: 'request',
             link: 'requests.html'
@@ -2351,7 +2351,7 @@ app.get('/api/admin/activity-logs', authenticateToken, requirePermission('view_a
 // BATCH UPLOAD HISTORY & NOTICE SYSTEM
 // ============================================================
 
-// POST /api/batches — Create a new batch session
+// POST /api/batches � Create a new batch session
 app.post('/api/batches', authenticateToken, requireUploadPermission, async (req, res) => {
     try {
         const { data, error } = await supabase
@@ -2372,7 +2372,7 @@ app.post('/api/batches', authenticateToken, requireUploadPermission, async (req,
     }
 });
 
-// PUT /api/batches/:id — Update batch counters
+// PUT /api/batches/:id � Update batch counters
 app.put('/api/batches/:id', authenticateToken, async (req, res) => {
     try {
         const { total_files, success_files } = req.body;
@@ -2388,7 +2388,7 @@ app.put('/api/batches/:id', authenticateToken, async (req, res) => {
     }
 });
 
-// GET /api/batches — List recent batches with dynamic counts from files table
+// GET /api/batches � List recent batches with dynamic counts from files table
 app.get('/api/batches', authenticateToken, async (req, res) => {
     try {
         // Fetch batches
@@ -2441,7 +2441,7 @@ app.get('/api/batches', authenticateToken, async (req, res) => {
     }
 });
 
-// GET /api/batches/:id/details — Get files in a batch, grouped by zona
+// GET /api/batches/:id/details � Get files in a batch, grouped by zona
 app.get('/api/batches/:id/details', authenticateToken, async (req, res) => {
     try {
         const { data: files, error } = await supabase
@@ -2490,7 +2490,7 @@ app.get('/api/zonas', authenticateToken, async (req, res) => {
     res.json({ zonas: data });
 });
 
-// POST /api/zonas — Create new zone
+// POST /api/zonas � Create new zone
 app.post('/api/zonas', authenticateToken, requirePermission('manage_zonas'), async (req, res) => {
     try {
         const { nama, wa_recipient } = req.body;
@@ -2511,7 +2511,7 @@ app.post('/api/zonas', authenticateToken, requirePermission('manage_zonas'), asy
     }
 });
 
-// PUT /api/zonas/:id â€” Update zone settings
+// PUT /api/zonas/:id — Update zone settings
 app.put('/api/zonas/:id', authenticateToken, requirePermission('manage_zonas'), async (req, res) => {
     try {
         const { nama, wa_recipient } = req.body;
@@ -2528,7 +2528,7 @@ app.put('/api/zonas/:id', authenticateToken, requirePermission('manage_zonas'), 
 });
 
 
-// POST /api/toko â€” Create new shop
+// POST /api/toko — Create new shop
 app.post('/api/toko', authenticateToken, requirePermission('manage_toko'), async (req, res) => {
     try {
         const { kode, nama, zona_id } = req.body;
@@ -2549,7 +2549,7 @@ app.post('/api/toko', authenticateToken, requirePermission('manage_toko'), async
     }
 });
 
-// PUT /api/toko/:id â€” Update shop
+// PUT /api/toko/:id — Update shop
 app.put('/api/toko/:id', authenticateToken, requirePermission('manage_toko'), async (req, res) => {
     try {
         const { kode, nama, zona_id } = req.body;
@@ -2565,7 +2565,7 @@ app.put('/api/toko/:id', authenticateToken, requirePermission('manage_toko'), as
     }
 });
 
-// DELETE /api/toko/:id â€” Delete shop
+// DELETE /api/toko/:id — Delete shop
 app.delete('/api/toko/:id', authenticateToken, requirePermission('manage_toko'), async (req, res) => {
     try {
         // Check if shop still has files linked
@@ -2597,7 +2597,7 @@ app.delete('/api/toko/:id', authenticateToken, requirePermission('manage_toko'),
 // MEDIA CATEGORIES ENDPOINTS (Super Admin only)
 // ============================================================
 
-// GET /api/media-categories â€” list all categories
+// GET /api/media-categories — list all categories
 app.get('/api/media-categories', authenticateToken, async (req, res) => {
     try {
         const { data, error } = await supabase
@@ -2612,7 +2612,7 @@ app.get('/api/media-categories', authenticateToken, async (req, res) => {
     }
 });
 
-// POST /api/media-categories â€” create new category
+// POST /api/media-categories — create new category
 app.post('/api/media-categories', authenticateToken, requirePermission('manage_media_ads'), async (req, res) => {
     try {
         const { nama, emoji, deskripsi, warna } = req.body;
@@ -2624,7 +2624,7 @@ app.post('/api/media-categories', authenticateToken, requirePermission('manage_m
             .from('media_categories')
             .insert({
                 nama: slug,
-                emoji: emoji || 'ðŸ“',
+                emoji: emoji || '📁',
                 deskripsi: deskripsi || '',
                 warna: warna || 'gray'
             })
@@ -2646,7 +2646,7 @@ app.post('/api/media-categories', authenticateToken, requirePermission('manage_m
         await supabase.from('audit_logs').insert({
             user_id: req.user.userId,
             action: 'Create Media Category',
-            context: `Created category: ${slug} (${emoji || 'ðŸ“'})`
+            context: `Created category: ${slug} (${emoji || '📁'})`
         });
 
         res.json({ success: true, category: data });
@@ -2656,7 +2656,7 @@ app.post('/api/media-categories', authenticateToken, requirePermission('manage_m
     }
 });
 
-// DELETE /api/media-categories/:id â€” delete category
+// DELETE /api/media-categories/:id — delete category
 app.delete('/api/media-categories/:id', authenticateToken, requirePermission('manage_media_ads'), async (req, res) => {
     try {
         const { error } = await supabase
@@ -2674,7 +2674,7 @@ app.delete('/api/media-categories/:id', authenticateToken, requirePermission('ma
 // ADS MEDIA ENDPOINTS (Super Admin only)
 // ============================================================
 
-// GET /api/ads-media â€” list all media
+// GET /api/ads-media — list all media
 app.get('/api/ads-media', authenticateToken, requirePermission('manage_media_ads'), async (req, res) => {
     try {
         const { category, search } = req.query;
@@ -2700,7 +2700,7 @@ app.get('/api/ads-media', authenticateToken, requirePermission('manage_media_ads
     }
 });
 
-// POST /api/ads-media/upload â€” upload media file
+// POST /api/ads-media/upload — upload media file
 app.post('/api/ads-media/upload', authenticateToken, requirePermission('manage_media_ads'), uploadMediaMulter.single('file'), async (req, res) => {
     try {
         if (!req.file) {
@@ -2744,7 +2744,7 @@ app.post('/api/ads-media/upload', authenticateToken, requirePermission('manage_m
     }
 });
 
-// GET /api/ads-media/:id/view â€” view/stream media file (inline)
+// GET /api/ads-media/:id/view — view/stream media file (inline)
 app.get('/api/ads-media/:id/view', async (req, res) => {
     try {
         // We allow viewing without token if token is in query (for <img> tags)
@@ -2801,7 +2801,7 @@ app.get('/api/ads-media/:id/view', async (req, res) => {
     }
 });
 
-// GET /api/ads-media/:id/download â€” download media file
+// GET /api/ads-media/:id/download — download media file
 app.get('/api/ads-media/:id/download', authenticateToken, async (req, res) => {
     try {
         const { data: media, error } = await supabase
@@ -2841,7 +2841,7 @@ app.get('/api/ads-media/:id/download', authenticateToken, async (req, res) => {
     }
 });
 
-// DELETE /api/ads-media/bulk â€” bulk soft delete
+// DELETE /api/ads-media/bulk — bulk soft delete
 app.delete('/api/ads-media/bulk', authenticateToken, requirePermission('manage_media_ads'), async (req, res) => {
     try {
         const { ids } = req.body;
@@ -2869,7 +2869,7 @@ app.delete('/api/ads-media/bulk', authenticateToken, requirePermission('manage_m
     }
 });
 
-// DELETE /api/ads-media/:id â€” soft delete
+// DELETE /api/ads-media/:id — soft delete
 app.delete('/api/ads-media/:id', authenticateToken, requirePermission('manage_media_ads'), async (req, res) => {
     try {
         const { data: media, error: findErr } = await supabase
@@ -3118,7 +3118,7 @@ app.post('/api/requests', authenticateToken, async (req, res) => {
         // Notify Moderators
         await createNotification({
             role: 'moderator',
-            title: '📄 Request Dokumen Baru',
+            title: '?? Request Dokumen Baru',
             message: `Admin Zona ${req.user.zona_id || '-'} meminta dokumen: ${pesan.substring(0, 50)}${pesan.length > 50 ? '...' : ''}`,
             type: 'request',
             link: 'requests.html'
@@ -3206,7 +3206,7 @@ app.put('/api/requests/:id', authenticateToken, async (req, res) => {
         if (request && request.user_id) {
             await createNotification({
                 user_id: request.user_id,
-                title: '✅ Request Dokumen Diupdate',
+                title: '? Request Dokumen Diupdate',
                 message: `Status permintaan Anda telah diubah menjadi "${status}".`,
                 type: status === 'Selesai' ? 'success' : 'info',
                 link: 'requests.html'
@@ -3260,7 +3260,7 @@ app.post('/api/bugs', authenticateToken, async (req, res) => {
         // Notify Moderators
         await createNotification({
             role: 'moderator',
-            title: '🐛 Laporan Bug Baru',
+            title: '?? Laporan Bug Baru',
             message: `Zona ${req.user.zona_id || '-'} melaporkan bug: ${tipe}`,
             type: 'error',
             link: 'bugs.html'
@@ -3313,7 +3313,7 @@ app.put('/api/bugs/:id', authenticateToken, async (req, res) => {
         try {
             const { data: bugData } = await supabase.from('bug_reports').select('user_id').eq('id', req.params.id).single();
             if (bugData && bugData.user_id) {
-                await createNotification({ user_id: bugData.user_id, title: '🔄 Status Bug Diperbarui', message: 'Laporan bug Anda kini berstatus "' + status + '".', type: 'info' });
+                await createNotification({ user_id: bugData.user_id, title: '?? Status Bug Diperbarui', message: 'Laporan bug Anda kini berstatus "' + status + '".', type: 'info' });
             }
         } catch (ne) { }
 
@@ -3339,7 +3339,7 @@ app.delete('/api/bugs/:id', authenticateToken, async (req, res) => {
     }
 });
 
-// POST /api/bugs/upload — Upload bug screenshot
+// POST /api/bugs/upload � Upload bug screenshot
 app.post('/api/bugs/upload', authenticateToken, uploadMediaMulter.single('file'), async (req, res) => {
     try {
         if (!req.file) return res.status(400).json({ error: 'Tidak ada file.' });
@@ -3354,7 +3354,7 @@ app.post('/api/bugs/upload', authenticateToken, uploadMediaMulter.single('file')
     }
 });
 
-// GET /api/bugs/view — View bug screenshot (proxied stream)
+// GET /api/bugs/view � View bug screenshot (proxied stream)
 app.get('/api/bugs/view', authenticateToken, async (req, res) => {
     try {
         const storagePath = req.query.path;
@@ -3570,18 +3570,18 @@ app.delete('/api/fleet/:id', authenticateToken, async (req, res) => {
 // ============================================================
 
 // Task 3.4: Log startup intent before binding
-console.log(`🚀 Backend starting on port ${process.env.PORT || 4000}`);
+console.log(`?? Backend starting on port ${process.env.PORT || 4000}`);
 
 // CRITICAL: Listen on 0.0.0.0 for Docker/Hugging Face compatibility
 // Listening on 'localhost' or '127.0.0.1' only works inside container
 // Must bind to 0.0.0.0 to be accessible from outside the container
 const HOST = '0.0.0.0';
 
-// Initialize startup sequence: Alist → Rclone → Node.js Server
+// Initialize startup sequence: Alist ? Rclone ? Node.js Server
 // (async () => {
 //     try {
 //         // Stage 1: Initialize Alist service (Task 2.1)
-//         console.log('[Backend] 🚀 Starting initialization sequence...');
+//         console.log('[Backend] ?? Starting initialization sequence...');
 //         console.log('[Stage 1] Initializing Alist service...');
         
 //         const alistResult = await initializeAlist();
@@ -3589,26 +3589,64 @@ const HOST = '0.0.0.0';
 //             console.error(alistResult.message);
 //             process.exit(1);
 //         }
-//         console.log('[Stage 1] ✅ Alist service ready');
+//         console.log('[Stage 1] ? Alist service ready');
 
 //         // Stage 2: Initialize storage credentials (Task 2.3)
 //         console.log('[Stage 2] Initializing storage credentials...');
 //         try {
 //             const result = await RcloneStorage.initializeRcloneCredentials();
 //             if (result.success) {
-//                 console.log(`✅ Storage credentials loaded from ${result.source}`);
+//                 console.log(`? Storage credentials loaded from ${result.source}`);
 //             } else {
-//                 console.warn(`⚠️ Storage credentials unavailable (using defaults): ${result.message}`);
+//                 console.warn(`?? Storage credentials unavailable (using defaults): ${result.message}`);
 //             }
 //         } catch (err) {
-//             console.error(`❌ Credential initialization error:`, err.message);
-//             console.warn('ℹ️ Continuing with default fallback credentials...');
+//             console.error(`? Credential initialization error:`, err.message);
+//             console.warn('?? Continuing with default fallback credentials...');
 //         }
-//         console.log('[Stage 2] ✅ Storage credentials initialized');
+//         console.log('[Stage 2] ? Storage credentials initialized');
 
 //         // Stage 3: Start Node.js server
 //         console.log('[Stage 3] Starting Node.js backend server...');
 //         const server = app.listen(port, HOST, () => {
+
+// ============================================================
+// SYNC ENDPOINT - Restore files from Terabox to Database
+// ============================================================
+
+const { syncFiles } = require('./sync-terabox-to-db');
+
+// POST /api/admin/sync-terabox - Sync existing Terabox files to database
+app.post('/api/admin/sync-terabox', authenticateToken, authorizeRole('moderator', 'super_admin'), async (req, res) => {
+    try {
+        console.log('[Sync API] Starting Terabox to database sync...');
+        console.log('[Sync API] Requested by:', req.user.email);
+        
+        // Run sync in background and return immediately
+        res.json({
+            success: true,
+            message: 'Sync started. Check server logs for progress.',
+            started_at: new Date().toISOString()
+        });
+        
+        // Run sync asynchronously
+        syncFiles()
+            .then(() => {
+                console.log('[Sync API] ? Sync completed successfully');
+            })
+            .catch(err => {
+                console.error('[Sync API] ? Sync failed:', err.message);
+            });
+        
+    } catch (err) {
+        console.error('[Sync API] Error:', err);
+        res.status(500).json({ error: 'Failed to start sync: ' + err.message });
+    }
+});
+
+// ============================================================
+// INITIALIZATION
+// ============================================================
 
 // Initialize storage credentials at startup
 (async () => {
@@ -3617,7 +3655,7 @@ const HOST = '0.0.0.0';
         // STAGE 1: Load environment variables
         // ================================================================
         console.log('\n================================================');
-        console.log('[Backend] 🚀 Starting Arsip Backend...');
+        console.log('[Backend] ?? Starting Arsip Backend...');
         console.log('[Backend] Time: ' + new Date().toISOString());
         console.log('================================================\n');
 
@@ -3628,7 +3666,7 @@ const HOST = '0.0.0.0';
 
         console.log(`[Config] PORT: ${PORT}`);
         console.log(`[Config] GCP_PROJECT_ID: ${GCP_PROJECT_ID || '(not set)'}`);
-        console.log('[Stage 1] ✅ Complete\n');
+        console.log('[Stage 1] ? Complete\n');
 
         // ================================================================
         // STAGE 2: Initialize Secret Manager client
@@ -3640,7 +3678,7 @@ const HOST = '0.0.0.0';
         } else {
             console.log('[SecretManager] GCP_PROJECT_ID not set, using fallback env vars');
         }
-        console.log('[Stage 2] ✅ Complete\n');
+        console.log('[Stage 2] ? Complete\n');
 
         // ================================================================
         // STAGE 3: Load Alist admin password from Secret Manager
@@ -3652,12 +3690,12 @@ const HOST = '0.0.0.0';
                 'ALIST_ADMIN_PASSWORD',
                 'admin123' // Development fallback only
             );
-            console.log('[SecretManager] ✓ Alist password loaded from Secret Manager/env vars');
+            console.log('[SecretManager] ? Alist password loaded from Secret Manager/env vars');
         } catch (err) {
             console.warn('[SecretManager] Failed to load Alist password:', err.message);
             console.warn('[SecretManager] Alist will use default credentials (development only)');
         }
-        console.log('[Stage 3] ✅ Complete\n');
+        console.log('[Stage 3] ? Complete\n');
 
         // ================================================================
         // STAGE 4: Start Alist service (OPTIONAL - only if binary exists)
@@ -3670,13 +3708,13 @@ const HOST = '0.0.0.0';
         
         const alistResult = await initializeAlist();
         if (!alistResult.success) {
-            console.warn('[Alist] ⚠️  Service not available (optional)');
+            console.warn('[Alist] ??  Service not available (optional)');
             console.warn(`[Alist] Reason: ${alistResult.classification}`);
             console.warn('[Alist] Using direct Rclone WebDAV to Terabox instead');
-            console.warn('[Stage 4] ⚠️  SKIPPED (optional) - Rclone WebDAV will be used\n');
+            console.warn('[Stage 4] ??  SKIPPED (optional) - Rclone WebDAV will be used\n');
         } else {
-            console.log('[Alist] ✅ Service running on http://localhost:5244');
-            console.log('[Stage 4] ✅ Complete\n');
+            console.log('[Alist] ? Service running on http://localhost:5244');
+            console.log('[Stage 4] ? Complete\n');
         }
 
         // ================================================================
@@ -3690,13 +3728,13 @@ const HOST = '0.0.0.0';
         const rcloneCheck = await verifyRcloneConnectivity();
         
         if (!rcloneCheck.success) {
-            console.warn('[Rclone] ⚠️  Connection not available (optional)');
+            console.warn('[Rclone] ??  Connection not available (optional)');
             console.warn(`[Rclone] Reason: ${rcloneCheck.error || rcloneCheck.message}`);
             console.warn('[Rclone] Files will be stored locally only');
-            console.warn('[Stage 5] ⚠️  SKIPPED (optional) - Local storage only\n');
+            console.warn('[Stage 5] ??  SKIPPED (optional) - Local storage only\n');
         } else {
-            console.log(`[Rclone] ✅ Connected (${rcloneCheck.fileCount || 0} files visible)`);
-            console.log('[Stage 5] ✅ Complete\n');
+            console.log(`[Rclone] ? Connected (${rcloneCheck.fileCount || 0} files visible)`);
+            console.log('[Stage 5] ? Complete\n');
         }
 
         // ================================================================
@@ -3706,7 +3744,7 @@ const HOST = '0.0.0.0';
         // Note: secretManager.js is already initialized in Stage 2
         // Rclone wrapper (rclone_wrapper.js) will use credentials from rclone.conf
         console.log('[RcloneWrapper] Using credentials from rclone.conf');
-        console.log('[Stage 6] ✅ Complete\n');
+        console.log('[Stage 6] ? Complete\n');
 
         // ================================================================
         // STAGE 7: Initialize storage credentials
@@ -3714,11 +3752,11 @@ const HOST = '0.0.0.0';
         console.log('[Stage 7] Initializing storage credentials...');
         const result = await RcloneStorage.initializeRcloneCredentials();
         if (result.success) {
-            console.log(`[Storage] ✓ Credentials loaded from ${result.source}`);
+            console.log(`[Storage] ? Credentials loaded from ${result.source}`);
         } else {
-            console.warn(`[Storage] ⚠ Credentials unavailable (using defaults): ${result.message}`);
+            console.warn(`[Storage] ? Credentials unavailable (using defaults): ${result.message}`);
         }
-        console.log('[Stage 7] ✅ Complete\n');
+        console.log('[Stage 7] ? Complete\n');
 
         // ================================================================
         // STAGE 8: Start Express server
@@ -3726,14 +3764,14 @@ const HOST = '0.0.0.0';
         console.log('[Stage 8] Starting Express server on port ' + PORT + '...');
         const server = app.listen(PORT, HOST, () => {
         // Task 3.4: Log successful port binding
-        console.log(`✅ Backend listening on port ${PORT}`);
-        console.log(`✅ External access: http://localhost:${PORT}`);
-        console.log(`🚀 Pusat Arsip Anka Backend v2.1 running on http://localhost:${PORT}`);
+        console.log(`? Backend listening on port ${PORT}`);
+        console.log(`? External access: http://localhost:${PORT}`);
+        console.log(`?? Pusat Arsip Anka Backend v2.1 running on http://localhost:${PORT}`);
         console.log(`   Auth: JWT (${JWT_EXPIRES_IN} expiry)`);
         console.log(`   Storage: Rclone (Terabox + Storj)`);
         console.log(`   DB: Supabase PostgreSQL`);
         console.log(`   Alist: WebDAV on http://localhost:5244`);
-        console.log('[Backend] ✅ ALL INITIALIZATION STAGES COMPLETE');
+        console.log('[Backend] ? ALL INITIALIZATION STAGES COMPLETE');
         console.log('[Backend] Backend ready at http://0.0.0.0:' + PORT);
         console.log('[Backend] Alist ready at http://localhost:5244');
         console.log('[Backend] Rclone ready - Terabox sync active');
@@ -3784,22 +3822,22 @@ const HOST = '0.0.0.0';
 
     // Handle process termination signals gracefully
     process.on('SIGTERM', () => {
-        console.log('📋 SIGTERM signal received: closing HTTP server');
+        console.log('?? SIGTERM signal received: closing HTTP server');
         server.close(() => {
-            console.log('✅ HTTP server closed');
+            console.log('? HTTP server closed');
             process.exit(0);
         });
     });
 
     process.on('SIGINT', () => {
-        console.log('📋 SIGINT signal received: closing HTTP server');
+        console.log('?? SIGINT signal received: closing HTTP server');
         server.close(() => {
-            console.log('✅ HTTP server closed');
+            console.log('? HTTP server closed');
             process.exit(0);
         });
     });
     } catch (err) {
-        console.error('[Backend] ❌ Initialization failed:', err.message);
+        console.error('[Backend] ? Initialization failed:', err.message);
         if (err.stack) {
             console.error('[Backend] Stack trace:', err.stack);
         }
@@ -3814,7 +3852,7 @@ const HOST = '0.0.0.0';
 
 // Handle uncaught synchronous errors
 process.on('uncaughtException', (err) => {
-    console.error('❌ UNCAUGHT EXCEPTION (Synchronous Error):');
+    console.error('? UNCAUGHT EXCEPTION (Synchronous Error):');
     console.error(`   Message: ${err.message}`);
     console.error(`   Stack: ${err.stack}`);
     if (err.filename) console.error(`   File: ${err.filename}:${err.lineno}:${err.colno}`);
@@ -3824,7 +3862,7 @@ process.on('uncaughtException', (err) => {
 
 // Handle unhandled promise rejections
 process.on('unhandledRejection', (reason, promise) => {
-    console.error('❌ UNHANDLED PROMISE REJECTION:');
+    console.error('? UNHANDLED PROMISE REJECTION:');
     console.error(`   Reason: ${reason instanceof Error ? reason.message : reason}`);
     if (reason instanceof Error) {
         console.error(`   Stack: ${reason.stack}`);
@@ -3833,4 +3871,5 @@ process.on('unhandledRejection', (reason, promise) => {
     console.error('   The application will exit gracefully.');
     process.exit(1);
 });
+
 
