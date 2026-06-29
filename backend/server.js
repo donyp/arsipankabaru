@@ -14,7 +14,7 @@ const RcloneStorage = require('./rclone_wrapper');
 const LocalStorage = require('./local_storage');
 const { initializeClient: initializeSecretManager, getSecret } = require('./secretManager');
 const { initializeAlist } = require('./alistStartupHandler');
-const { initializeRcloneConnectivity } = require('./rcloneConnectivityHandler');
+const { initializeRcloneConnectivity, verifyRcloneConnectivity } = require('./rcloneConnectivityHandler');
 
 // Load environment variables FIRST (before using them)
 // In local development: loads from .env file
