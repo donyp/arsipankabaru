@@ -3660,20 +3660,24 @@ const HOST = '0.0.0.0';
         console.log('[Stage 3] ✅ Complete\n');
 
         // ================================================================
-        // STAGE 4: Start Alist service
+        // STAGE 4: Start Alist service (OPTIONAL - only if binary exists)
         // ================================================================
-        console.log('[Stage 4] Starting Alist service...');
+        // NOTE: Alist is OPTIONAL in HF Spaces / Docker deployments
+        // We use direct Rclone WebDAV to Terabox instead
+        // If Alist binary is present, it starts for local storage access
+        // If not, we skip it and use Rclone WebDAV only
+        console.log('[Stage 4] Checking Alist service...');
         
         const alistResult = await initializeAlist();
         if (!alistResult.success) {
-            console.error('[Alist] ❌ FAILED TO START');
-            console.error(alistResult.message);
-            console.error('\n[Backend] Initialization FAILED at Stage 4 (Alist Service)');
-            console.error('[Backend] Exiting with status code 1\n');
-            process.exit(1);
+            console.warn('[Alist] ⚠️  Service not available (optional)');
+            console.warn(`[Alist] Reason: ${alistResult.classification}`);
+            console.warn('[Alist] Using direct Rclone WebDAV to Terabox instead');
+            console.warn('[Stage 4] ⚠️  SKIPPED (optional) - Rclone WebDAV will be used\n');
+        } else {
+            console.log('[Alist] ✅ Service running on http://localhost:5244');
+            console.log('[Stage 4] ✅ Complete\n');
         }
-        console.log('[Alist] ✅ Service running on http://localhost:5244');
-        console.log('[Stage 4] ✅ Complete\n');
 
         // ================================================================
         // STAGE 5: Verify Rclone connectivity
