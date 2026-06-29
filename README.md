@@ -4,8 +4,9 @@ emoji: 📂
 colorFrom: indigo
 colorTo: blue
 sdk: docker
-pinned: false
+sdk_version: "1.0"
 app_file: backend/server.js
+pinned: false
 ---
 
 # 🏢 Pusat Arsip Anka
