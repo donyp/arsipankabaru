@@ -3680,21 +3680,24 @@ const HOST = '0.0.0.0';
         }
 
         // ================================================================
-        // STAGE 5: Verify Rclone connectivity
+        // STAGE 5: Verify Rclone connectivity (OPTIONAL)
         // ================================================================
-        console.log('[Stage 5] Verifying Rclone connectivity...');
+        // NOTE: Rclone connectivity is OPTIONAL
+        // If Terabox is empty or WebDAV not working, app can still run
+        // Files will be stored locally, sync can be done manually later
+        console.log('[Stage 5] Checking Rclone connectivity...');
         
         const rcloneCheck = await verifyRcloneConnectivity();
         
         if (!rcloneCheck.success) {
-            console.error('[Rclone] ❌ FAILED TO CONNECT');
-            console.error(rcloneCheck.message || rcloneCheck.error);
-            console.error('\n[Backend] Initialization FAILED at Stage 5 (Rclone Verification)');
-            console.error('[Backend] Exiting with status code 1\n');
-            process.exit(1);
+            console.warn('[Rclone] ⚠️  Connection not available (optional)');
+            console.warn(`[Rclone] Reason: ${rcloneCheck.error || rcloneCheck.message}`);
+            console.warn('[Rclone] Files will be stored locally only');
+            console.warn('[Stage 5] ⚠️  SKIPPED (optional) - Local storage only\n');
+        } else {
+            console.log(`[Rclone] ✅ Connected (${rcloneCheck.fileCount || 0} files visible)`);
+            console.log('[Stage 5] ✅ Complete\n');
         }
-        console.log(`[Rclone] ✅ Connected (${rcloneCheck.fileCount || 0} files visible)`);
-        console.log('[Stage 5] ✅ Complete\n');
 
         // ================================================================
         // STAGE 6: Initialize Rclone credential handler
