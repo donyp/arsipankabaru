@@ -42,15 +42,16 @@ RUN chmod +x /app/start.sh
 RUN mkdir -p /app/data/log /app/data/temp /app/backend/data/log /app/backend/data/temp
 
 # Environment variables
-# Cloud Run uses PORT environment variable (default 8080)
-# But we keep 7860 as default for local/Hugging Face compatibility
-ENV PORT=${PORT:-8080}
+# Cloud Run uses PORT=8080
+# Hugging Face Spaces uses PORT=7860
+# Local uses PORT=7860
+ENV PORT=${PORT:-7860}
 ENV NODE_ENV=production
 ENV NODE_OPTIONS=--max-old-space-size=512
 
-# Expose port (8080 for Cloud Run / Node backend)
+# Expose port (7860 for Hugging Face / 8080 for Cloud Run)
 # Rclone connects directly to Terabox WebDAV (no local service needed)
-EXPOSE 8080
+EXPOSE 7860
 
 # Add Health Check for Cloud Run / Kubernetes environments
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \

@@ -1,0 +1,106 @@
+🤗 HUGGING FACE SPACES - QUICK START (5 MINUTES)
+================================================
+
+STEP 1: Create Space (2 min)
+----------------------------
+1. Go to: https://huggingface.co/new-space
+2. Fill:
+   - Space name: arsip-anka
+   - SDK: Docker
+   - Visibility: Public
+3. Click: Create Space
+
+STEP 2: Link GitHub (1 min)
+----------------------------
+1. Space Settings → Repository tab
+2. Link: https://github.com/donyp/arsipankabaru.git
+3. Auto-deploys on git push
+
+STEP 3: Add Secrets (2 min)
+----------------------------
+Go to: Space Settings → Repository secrets
+Add these:
+
+SUPABASE_URL
+[copy from previous deployment]
+
+SUPABASE_SERVICE_ROLE_KEY
+[copy from previous deployment]
+
+JWT_SECRET
+[any random 32+ char string]
+
+TERABOX_WEBDAV_URL
+https://pan.baidu.com/api/publicweb/terabox.php
+
+TERABOX_USER
+[your terabox email/username]
+
+TERABOX_PASS
+[your terabox password]
+
+STEP 4: Wait for Build (~3 min)
+-------------------------------
+Watch Status:
+⏳ Orange = Building
+✅ Green = Ready!
+❌ Red = Check logs
+
+STEP 5: Access App
+------------------
+URL: https://huggingface.co/spaces/[your-user]/arsip-anka
+
+LOGIN & TEST
+============
+
+1. Login with admin credentials
+2. Upload test file
+3. Check logs for sync success
+4. Verify file in Terabox account
+
+VERIFY SETUP
+============
+
+✓ App loads (green status)
+✓ Login works
+✓ File upload works
+✓ No errors in logs
+✓ File syncs to Terabox
+
+IMPORTANT NOTES
+===============
+
+FREE: Completely free
+STORAGE: 50GB total
+SLEEP: After 48 hours idle (auto-wakes)
+ALWAYS ON: No, but wakes on request
+PERFORMANCE: Shared CPU (fine for testing)
+
+HELP
+====
+
+Stuck?
+1. Check logs: Space → Logs
+2. Check README: HF_SPACES_README.md
+3. Full guide: HF_SPACES_SETUP_GUIDE.md
+4. GitHub: https://github.com/donyp/arsipankabaru
+
+COMMON ERRORS
+=============
+
+Build failed → Check logs, verify npm install works
+App won't start → Check all secrets are set
+Login fails → Check SUPABASE credentials
+Sync fails → Check TERABOX credentials
+Blank page → Wait 10sec (cold start)
+
+NEXT STEPS
+==========
+
+1. Complete setup above (5 min)
+2. Test all features (15 min)
+3. Monitor logs (daily)
+4. If good, you're done! ✅
+5. If issues, check troubleshooting guide
+
+Good luck! 🚀
