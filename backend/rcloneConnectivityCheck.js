@@ -7,8 +7,8 @@ const { execFile } = require('child_process');
 const path = require('path');
 
 /**
- * Check if Rclone can successfully connect to Alist WebDAV endpoint
- * Executes: rclone --config rclone.conf lsjson terabox:/
+ * Check if Rclone can successfully connect to Terabox Direct WebDAV endpoint
+ * Executes: rclone --config rclone.conf lsjson terabox_direct:/
  * 
  * Returns:
  * - On success: { success: true, message: "..." }
@@ -25,11 +25,11 @@ async function verifyRcloneConnectivity(rcloneConfigPath = null) {
         const timeout = 15000; // 15 second timeout
         let timedOut = false;
 
-        // Execute: rclone --config <path> lsjson terabox:/
+        // Execute: rclone --config <path> lsjson terabox_direct:/
         const child = execFile('rclone', [
             '--config', configPath,
             'lsjson',
-            'terabox:/'
+            'terabox_direct:/'
         ], {
             timeout,
             maxBuffer: 1024 * 1024 // 1MB buffer for output
@@ -91,7 +91,7 @@ async function verifyRcloneConnectivity(rcloneConfigPath = null) {
             // Bad remote name
             else if (stderrStr.includes('didn\'t find remote') || stderrStr.includes('Unknown remote')) {
                 classification = 'BAD_REMOTE';
-                diagnostic = 'Remote "terabox" not configured in rclone.conf. Check [terabox] section exists';
+                diagnostic = 'Remote "terabox_direct" not configured in rclone.conf. Check [terabox_direct] section exists';
             }
             // File not found / config error
             else if (stderrStr.includes('not found') || stderrStr.includes('Config')) {
