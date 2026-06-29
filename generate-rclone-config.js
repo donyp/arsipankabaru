@@ -19,8 +19,8 @@ const config = {
     // IMPORTANT: Password must be obscured using: rclone obscure "password"
     terabox_direct_url: process.env.TERABOX_DIRECT_URL || 'https://pan.baidu.com/api/publicweb/terabox.php',
     terabox_direct_user: process.env.TERABOX_DIRECT_USER || process.env.TERABOX_USER || 'ptggianka@gmail.com',
-    // Pre-obscured: rclone obscure "ptggianka2022" => IvFf-goPigjVmVBFyCed7xA3PhyqttMDByo0UOk
-    terabox_direct_pass: process.env.TERABOX_DIRECT_PASS || 'IvFf-goPigjVmVBFyCed7xA3PhyqttMDByo0UOk',
+    // Pre-obscured: rclone obscure "ptggianka2025" => LYEeTD4Q-4RzycY2fM4bZH2rzBhyxY98IpXwqQo
+    terabox_direct_pass: process.env.TERABOX_DIRECT_PASS || 'LYEeTD4Q-4RzycY2fM4bZH2rzBhyxY98IpXwqQo',
     
     // Terabox Crypt config
     terabox_crypt_password: process.env.TERABOX_CRYPT_PASSWORD || 'uR-oRsbNnnKcfycXNO_4o4i5luHbnE-ncDCN3JaRvC4',
