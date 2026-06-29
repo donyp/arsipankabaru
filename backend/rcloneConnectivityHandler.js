@@ -140,8 +140,8 @@ function classifyRcloneError(stderr, exitCode) {
 }
 
 /**
- * Verify Rclone connectivity to Alist WebDAV
- * Executes: rclone --config rclone.conf lsjson terabox:/
+ * Verify Rclone connectivity to Terabox Direct WebDAV
+ * Executes: rclone --config rclone.conf lsjson terabox_direct:/
  * 
  * Returns: {
  *   verified: boolean,
@@ -180,7 +180,7 @@ async function verifyRcloneConnectivity() {
     }
 
     return new Promise((resolve) => {
-        const remoteConfig = 'terabox:/';
+        const remoteConfig = 'terabox_direct:/';
         const args = ['--config', configPath, 'lsjson', remoteConfig];
 
         console.log(`[Rclone] Executing: ${rclonePath} ${args.join(' ')}`);
