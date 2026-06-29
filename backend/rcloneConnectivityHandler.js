@@ -213,9 +213,10 @@ async function verifyRcloneConnectivity() {
                 const classification = classifyRcloneError(stderr || error.message, error.code);
                 const message = `[Rclone] ❌ Connection failed (${classification.type})`;
                 
-                console.error(message);
-                console.error(`[Rclone] Error details: ${classification.message}`);
-                console.error(`[Rclone] Stderr: ${stderr || error.message}`);
+                // Silently handle error - logging handled by caller if needed
+                // console.error(message);
+                // console.error(`[Rclone] Error details: ${classification.message}`);
+                // console.error(`[Rclone] Stderr: ${stderr || error.message}`);
 
                 // Load credentials from rclone.conf for diagnostic logging
                 let credentialInfo = '';

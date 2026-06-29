@@ -50,7 +50,7 @@ async function performHealthCheck(url, maxAttempts = 10, initialDelayMs = 500) {
             lastError = err;
             if (attempt < maxAttempts) {
                 const delayMs = initialDelayMs * Math.pow(2, attempt - 1);
-                console.log(`[Alist] Health check attempt ${attempt} failed: ${err.message}, retrying in ${delayMs}ms...`);
+                // Silently retry - no log spam for optional services
                 await new Promise(r => setTimeout(r, delayMs));
             }
         }
