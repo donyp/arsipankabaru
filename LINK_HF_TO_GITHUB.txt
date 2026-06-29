@@ -1,0 +1,39 @@
+🔗 LINK HUGGING FACE SPACE KE GITHUB
+
+STEP-BY-STEP:
+
+1. Go to Hugging Face Space:
+   https://huggingface.co/spaces/ankaindonesia/arsipankabaru
+
+2. Click: Settings ⚙️ (top right)
+
+3. Click: Repository tab
+
+4. Find: "Repository" section
+
+5. Link your GitHub repo:
+   https://github.com/donyp/arsipankabaru.git
+
+6. Click: Link Repository / Connect / Sync
+
+7. Wait: HF auto-deploys from GitHub!
+
+---
+
+RESULT:
+- All files dari GitHub akan sync ke HF
+- Dockerfile akan detect otomatis
+- Docker build akan dimulai
+- Status akan jadi GREEN ✅
+
+---
+
+KEUNTUNGAN:
+✅ Semua files dari GitHub
+✅ Auto-deploy on push
+✅ No manual upload needed
+✅ Paling simple!
+
+---
+
+That's it! Tinggal link ke GitHub dan done! 🚀
